@@ -1,0 +1,58 @@
+\documentclass{article}
+\usepackage{tikz}
+\usepackage{spline}
+
+\usetikzlibrary{intersections}
+
+\tikzset{spline debug}
+
+\begin{document}
+\begin{tikzpicture}
+\draw[help lines] (0,0) grid (3,3);
+\node [draw,circle]    (A) at (0,1) {A};
+\node [draw,rectangle] (B) at (3,1) {B};
+\node [draw,circle]    (C) at (2,3) {C};
+\node [draw,circle]    (D) at (1.5,0) {D};
+
+%\draw[blue] (A.center) to[spline through=(B.center)(C.center)] (D.center);
+\draw[red,->, shorten >=2pt] (A) to[spline through=(B)(C)] (D);
+\end{tikzpicture}
+
+% \begin{tikzpicture}
+% \draw (0,0) grid [help lines] (3,3);
+% \coordinate (start) at (0,1);
+% \coordinate (end) at (3,1);
+% 
+% \draw[->] (start) to[spline through={(1,0)(1.5,3)(2,1)}] (end);
+% \draw[red] (start)
+%   .. controls (10.66978pt,5.08085pt) and (21.33955pt,-18.29105pt) .. (28.45274pt,0.00000pt)
+%   .. controls (35.56593pt,18.29105pt) and (39.12252pt,78.24503pt) .. (42.67911pt,85.35822pt)
+%   .. controls (46.23570pt,92.47141pt) and (49.79229pt,46.74379pt) .. (56.90548pt,28.45274pt)
+%   .. controls (64.01866pt,10.16169pt) and (74.68844pt,19.30722pt) .. (end);
+% \end{tikzpicture}
+
+\begin{tikzpicture}
+\draw circle (1cm);
+\draw[red, <-] \pgfextra
+\pgfintersectionsortbyfirstpath
+\pgfintersectionofpaths
+{
+  \pgfpathmoveto{\pgfpointorigin}
+  \pgfpathcurveto{\pgfpointxy{1}{1}}{\pgfpointxy{1}{2}}{\pgfpointxy{0}{3}}
+}
+{
+  \pgfpathcircle{\pgfpointorigin}{1cm}
+  \pgfgetpath\temppath
+  \pgfusepath{stroke}
+  \pgfsetpath\temppath
+}
+\pgfintersectiongetsolutiontimes{1}{\segmenta}{\segmentb}
+\pgfpathcurvebetweentime{\segmenta}{1}{\pgfpointorigin}{\pgfpointxy{1}{1}}{\pgfpointxy{1}{2}}{\pgfpointxy{0}{3}}
+\endpgfextra;
+%\pgfsetstrokecolor{black}
+%\pgfpathcircle{\pgfpointintersectionsolution{1}}{2pt}
+%\pgfusepath{stroke}
+\end{tikzpicture}
+
+\end{document}
+% vim: set sw=2 sts=2 ts=8 et:
