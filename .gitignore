@@ -1,5 +1,6 @@
-test.aux
-test.fdb_latexmk
-test.fls
-test.log
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.log
 test.pdf
