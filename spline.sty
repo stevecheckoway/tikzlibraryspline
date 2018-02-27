@@ -33,6 +33,7 @@
   \expandafter\tikz@spline@compute@r\tikz@spline@temp
   \expandafter\tikz@spline@compute@segments\tikz@spline@temp
   \tikz@spline@path
+  \let\tikz@timer=\tikz@timer@spline
 }
 
 \def\tikz@spline@parse@points{%
@@ -227,11 +228,7 @@
   \c@pgf@countc=0
   \tikz@spline@pathA
   % Update some values for TikZ in case additional path components are added
-  \ifx\tikz@spline@end\relax
-    \let\tikz@moveto@waiting=\relax
-  \else
-    \edef\tikz@moveto@waiting{\tikz@spline@end}%
-  \fi
+  \let\tikz@moveto@waiting=\tikz@spline@end
 }
 
 \newif\iftikz@spline@use@time
@@ -268,6 +265,8 @@
       \tikz@spline@use@timetrue
     }%
   \fi
+  % If either endpoint was a shape, use \pgfpathcurvebetweentime to draw just
+  % part of the curve.
   \iftikz@spline@use@time
     \tikz@spline@debug{\space\space\space\space from t=\tikz@spline@timea\space to
       t=\tikz@spline@timeb}%
@@ -276,9 +275,35 @@
   \else
     \pgfpathcurveto{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
   \fi
+  \ifnum\c@pgf@countc=0
+    % Save the start time for the timer.
+    \let\tikz@spline@timer@start=\tikz@spline@timea
+  \fi
   \advance\c@pgf@countc by1
   \ifnum\c@pgf@countc<\tikz@spline@segments\relax
     \expandafter\tikz@spline@pathA
+  \else
+    % Save the end time for the timer, set the last position, and the tangent.
+    \ifdim\tikz@spline@timeb pt<1pt
+      \begingroup
+      % \pgfpointcurveattime puts points on the tangent in xa/ya and xb/yb.
+      % XXX: This was computed from the intersection before, we could reuse it.
+      \pgfpointcurveattime{\tikz@spline@timeb}{\tikz@spline@zeroth}{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
+      \global\pgf@x=\pgf@x
+      \global\pgf@y=\pgf@y
+      \edef\tikz@marshal{%
+        \endgroup
+        \def\noexpand\tikz@tangent{\noexpand\pgfqpoint{\the\pgf@xa}{\the\pgf@ya}}%
+      }%
+      \tikz@marshal
+      \tikz@make@last@position{}% We already globally set \pgf@x/\pgf@y
+    \else
+      % The end point of the curve is the last position and the second control
+      % point is on the tangent.
+      \tikz@make@last@position{\tikz@spline@third}%
+      \let\tikz@tangent=\tikz@spline@second
+    \fi
+    \let\tikz@spline@timer@end=\tikz@spline@timeb
   \fi
 }
 
@@ -301,12 +326,57 @@
   }
   \ifnum\pgfintersectionsolutions=0
     \tikz@spline@debug{Unable to find an intersection between `#1' and the spline}
+    \pgf@process{%
+      \ifnum#3=0
+        \tikz@spline@zeroth
+      \else
+        \tikz@spline@third
+      \fi
+    }%
   \else
     \pgfintersectiongetsolutiontimes{#3}{#2}{\tikz@spline@dummy}%
   \fi
   \edef\tikz@marshal{\endgroup\def\noexpand#2{#2}}%
   \tikz@marshal
 }
-    
+
+% Transform \tikz@time to a point along the spline. If the start or end are
+% shapes, then times 0 and 1 correspond to intersection points with the
+% border.
+\def\tikz@timer@spline{%
+  % Compute the segment number in \c@pgf@counta
+  \pgf@xa=\tikz@time \tikz@spline@segments
+  \c@pgf@counta=\pgf@xa
+  % Compute the fractional part in \pgf@xa
+  \ifnum\c@pgf@counta=\tikz@spline@segments
+    \c@pgf@counta=\tikz@spline@max@interior@point
+    \pgf@xa=1pt
+  \else
+    \pgf@xa=\tikz@time pt
+    \pgf@xa=\tikz@spline@segments \pgf@xa
+    \advance\pgf@xa by -\c@pgf@counta pt
+  \fi
+  % Determine the start and end of the segments
+  \ifnum\c@pgf@counta=0
+    \pgf@xb=\tikz@spline@timer@start pt
+  \else
+    \pgf@xb=0pt
+  \fi
+  \ifnum\c@pgf@counta=\tikz@spline@max@interior@point
+    \pgf@yb=\tikz@spline@timer@end pt
+  \else
+    \pgf@yb=1pt
+  \fi
+  % Put the scaling factor in \pgf2yb
+  \advance\pgf@yb by-\pgf@xb
+  % Compute scaled and shifted time
+  \pgf@xa=\pgf@sys@tonumber{\pgf@yb}\pgf@xa
+  \advance\pgf@xa by\pgf@xb
+  \edef\tikz@spline@time{\pgf@sys@tonumber{\pgf@xa}}
+  % Get the appropriate control points for the segment
+  \tikz@spline@select{\c@pgf@counta}%
+  \pgftransformcurveattime{\tikz@spline@time}{\tikz@spline@zeroth}{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
+}
+
 \endinput
 % vim: set sw=2 sts=2 ts=8 et nospell:

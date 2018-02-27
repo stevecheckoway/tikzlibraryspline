@@ -15,7 +15,9 @@
 \node [draw,circle]    (D) at (1.5,0) {D};
 
 %\draw[blue] (A.center) to[spline through=(B.center)(C.center)] (D.center);
-\draw[red,->, shorten >=2pt] (A) to[spline through=(B)(C)] (D);
+\draw[red,->, shorten >=2pt] (A) to[spline through=(B)(C)(D)]
+  node foreach \t in {0,.05,...,1.01} [pos=\t,circle,fill,inner
+  sep=1pt,color=blue] {} (A);
 \end{tikzpicture}
 
 % \begin{tikzpicture}
