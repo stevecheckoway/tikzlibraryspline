@@ -24,7 +24,7 @@
   \pgfintersectionsortbyfirstpath
   \let\tikz@spline@temp=\pgfutil@empty
   \tikz@spline@segments=-1
-  \tikz@spline@parse@points#1\@nil
+  \tikz@spline@parse@points#1\pgf@stop
   \c@pgf@countc=\tikz@spline@segments
   \advance\c@pgf@countc by-1
   \mathchardef\tikz@spline@max@interior@point\c@pgf@countc
@@ -37,7 +37,7 @@
 }
 
 \def\tikz@spline@parse@points{%
-  \pgfutil@ifnextchar\@nil{%
+  \pgfutil@ifnextchar\pgf@stop{%
     \pgfutil@gobble 
   }{%
     \tikz@scan@one@point\tikz@spline@handle@point
@@ -47,6 +47,7 @@
 % Append the point as x,y/node name& to \tikz@spline@temp
 \def\tikz@spline@handle@point#1{%
   \tikz@make@last@position{#1}%
+  \tikz@spline@debug{Parsed point: (\the\tikz@lastx,\the\tikz@lasty) \detokenize{#1}}
   \iftikz@shapeborder
     \edef\tikz@spline@temp{\tikz@spline@temp\the\tikz@lastx,\the\tikz@lasty/\tikz@shapeborder@name&}%
   \else
