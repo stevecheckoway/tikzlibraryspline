@@ -9,16 +9,70 @@
 \begin{document}
 \begin{tikzpicture}
 \draw[help lines] (0,0) grid (3,3);
-\node [draw,circle]    (A) at (0,1) {A};
-\node [draw,rectangle] (B) at (3,1) {B};
-\node [draw,circle]    (C) at (2,3) {C};
-\node [draw,circle]    (D) at (1.5,0) {D};
-
-%\draw[blue] (A.center) to[spline through=(B.center)(C.center)] (D.center);
-\draw[red,->, shorten >=2pt] (A) to[spline through=(B)(C)(D)]
-  node foreach \t in {0,.05,...,1.01} [pos=\t,circle,fill,inner
-  sep=1pt,color=blue] {} (A);
+\draw[yshift=.1cm,red]  (0,1) to[spline through={(3,1)(2,3)(1.5,0)}] (0,1);
+\draw[yshift=.2cm,blue] (0,1) to[spline through={++(3,0)++(-1,2)++(-.5,-3)}] ++(0,0);
+\draw[black] (0,1) to[spline through={+(3,0)+(2,2)+(1.5,-1)}] +(0,0);
 \end{tikzpicture}
+
+\begin{tikzpicture}
+\draw[help lines] (0,0) grid (3,3);
+\draw[red, ->] (0.00000pt,28.45274pt)
+.. controls (38.88541pt,20.23306pt) and (77.77082pt,12.01338pt) .. (85.35822pt,28.45274pt)
+.. controls (92.94562pt,44.89210pt) and (69.23500pt,85.99050pt) .. (56.90548pt,85.35822pt)
+.. controls (44.57596pt,84.72594pt) and (43.62753pt,42.36297pt) .. (42.67911pt,0.00000pt)
+;
+\fill[green] (38.88541pt,20.23306pt) circle (1pt);
+\fill[red]   (77.77082pt,12.01338pt) circle (1pt);
+\draw (0.00000pt,28.45274pt) -- (38.88541pt,20.23306pt);
+\draw (85.35822pt,28.45274pt) -- (77.77082pt,12.01338pt);
+\fill[green] (92.94562pt,44.89210pt) circle (1pt);
+\fill[red]   (69.23500pt,85.99050pt) circle (1pt);
+\draw (85.35822pt,28.45274pt) -- (92.94562pt,44.89210pt);
+\draw (56.90548pt,85.35822pt) -- (69.23500pt,85.99050pt);
+\fill[green] (44.57596pt,84.72594pt) circle (1pt);
+\fill[red]   (43.62753pt,42.36297pt) circle (1pt);
+\draw (56.90548pt,85.35822pt) -- (44.57596pt,84.72594pt);
+\draw (42.67911pt,0.00000pt) -- (43.62753pt,42.36297pt);
+\end{tikzpicture}
+
+\begin{tikzpicture}
+\draw[help lines] (0,0) grid (3,3);
+\draw[blue, ->] (0.00000pt,28.45274pt)
+.. controls (10.66978pt,35.56592pt) and (71.13185pt,14.22637pt) .. (85.35822pt,28.45274pt)
+.. controls (99.58459pt,42.67911pt) and (67.57526pt,92.47140pt) .. (56.90548pt,85.35822pt)
+.. controls (46.23570pt,78.24503pt) and (56.90548pt,14.22637pt) .. (42.67911pt,0.00000pt)
+.. controls (28.45274pt,-14.22637pt) and (-10.66978pt,21.33956pt) .. (0.00000pt,28.45274pt)
+;
+\fill[green] (10.66978pt,35.56592pt) circle (1pt);
+\fill[red]   (71.13185pt,14.22637pt) circle (1pt);
+\draw (0.00000pt,28.45274pt) -- (10.66978pt,35.56592pt);
+\draw (85.35822pt,28.45274pt) -- (71.13185pt,14.22637pt);
+\fill[green] (99.58459pt,42.67911pt) circle (1pt);
+\fill[red]   (67.57526pt,92.47140pt) circle (1pt);
+\draw (85.35822pt,28.45274pt) -- (99.58459pt,42.67911pt);
+\draw (56.90548pt,85.35822pt) -- (67.57526pt,92.47140pt);
+\fill[green] (46.23570pt,78.24503pt) circle (1pt);
+\fill[red]   (56.90548pt,14.22637pt) circle (1pt);
+\draw (56.90548pt,85.35822pt) -- (46.23570pt,78.24503pt);
+\draw (42.67911pt,0.00000pt) -- (56.90548pt,14.22637pt);
+\fill[green] (28.45274pt,-14.22637pt) circle (1pt);
+\fill[red]   (-10.66978pt,21.33956pt) circle (1pt);
+\draw (42.67911pt,0.00000pt) -- (28.45274pt,-14.22637pt);
+\draw (0.00000pt,28.45274pt) -- (-10.66978pt,21.33956pt);
+\end{tikzpicture}
+
+% \begin{tikzpicture}
+% \draw[help lines] (0,0) grid (3,3);
+% \node [draw,circle]    (A) at (0,1) {A};
+% \node [draw,rectangle] (B) at (3,1) {B};
+% \node [draw,circle]    (C) at (2,3) {C};
+% \node [draw,circle]    (D) at (1.5,0) {D};
+% 
+% %\draw[blue] (A.center) to[spline through=(B.center)(C.center)] (D.center);
+% \draw[red,->, shorten >=2pt] (A) to[spline through=(B)(C)(D)]
+%   node foreach \t in {0,.025,...,1.01} [pos=\t,circle,fill,inner sep=1pt,color=blue] {}
+%   (A);
+% \end{tikzpicture}
 
 % \begin{tikzpicture}
 % \draw (0,0) grid [help lines] (3,3);
@@ -33,28 +87,28 @@
 %   .. controls (64.01866pt,10.16169pt) and (74.68844pt,19.30722pt) .. (end);
 % \end{tikzpicture}
 
-\begin{tikzpicture}
-\draw circle (1cm);
-\draw[red, <-] \pgfextra
-\pgfintersectionsortbyfirstpath
-\pgfintersectionofpaths
-{
-  \pgfpathmoveto{\pgfpointorigin}
-  \pgfpathcurveto{\pgfpointxy{1}{1}}{\pgfpointxy{1}{2}}{\pgfpointxy{0}{3}}
-}
-{
-  \pgfpathcircle{\pgfpointorigin}{1cm}
-  \pgfgetpath\temppath
-  \pgfusepath{stroke}
-  \pgfsetpath\temppath
-}
-\pgfintersectiongetsolutiontimes{1}{\segmenta}{\segmentb}
-\pgfpathcurvebetweentime{\segmenta}{1}{\pgfpointorigin}{\pgfpointxy{1}{1}}{\pgfpointxy{1}{2}}{\pgfpointxy{0}{3}}
-\endpgfextra;
-%\pgfsetstrokecolor{black}
-%\pgfpathcircle{\pgfpointintersectionsolution{1}}{2pt}
-%\pgfusepath{stroke}
-\end{tikzpicture}
+% \begin{tikzpicture}
+% \draw circle (1cm);
+% \draw[red, <-] \pgfextra
+% \pgfintersectionsortbyfirstpath
+% \pgfintersectionofpaths
+% {
+%   \pgfpathmoveto{\pgfpointorigin}
+%   \pgfpathcurveto{\pgfpointxy{1}{1}}{\pgfpointxy{1}{2}}{\pgfpointxy{0}{3}}
+% }
+% {
+%   \pgfpathcircle{\pgfpointorigin}{1cm}
+%   \pgfgetpath\temppath
+%   \pgfusepath{stroke}
+%   \pgfsetpath\temppath
+% }
+% \pgfintersectiongetsolutiontimes{1}{\segmenta}{\segmentb}
+% \pgfpathcurvebetweentime{\segmenta}{1}{\pgfpointorigin}{\pgfpointxy{1}{1}}{\pgfpointxy{1}{2}}{\pgfpointxy{0}{3}}
+% \endpgfextra;
+% %\pgfsetstrokecolor{black}
+% %\pgfpathcircle{\pgfpointintersectionsolution{1}}{2pt}
+% %\pgfusepath{stroke}
+% \end{tikzpicture}
 
 \end{document}
 % vim: set sw=2 sts=2 ts=8 et:
