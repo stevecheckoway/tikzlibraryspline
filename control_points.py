@@ -90,30 +90,31 @@ def cyclic2(rx, ry):
     x = [-1e9] * n
     y = [-1e9] * n
     z = [-1e9] * n
-    g = [-1e9] * n
+    bb = [-1e9] * n
 
     # Since alpha = beta = gamma = 1,
     # b[0] = b[n-1] = 3 and u[0] = u[n-1] = 1
-    bet = 3.0 # b[0]
-    x[0] = rx[0] / bet
-    y[0] = ry[0] / bet
-    z[0] = 1.0/bet # u[0] / bet
+    bb[0] = 3.0
+    x[0] = rx[0]
+    y[0] = ry[0]
+    z[0] = 1
     for i in range(1, n-1):
-        g[i] = 1.0/bet # c[i-1]/bet
-        bet = 4.0 - g[i] # b[i] - a[i]*g[i]
-        x[i] = (rx[i] - x[i-1])/bet
-        y[i] = (ry[i] - y[i-1])/bet
-        z[i] = (0.0 - z[i-1])/bet
-    g[n-1] = 1.0/bet
-    bet = 3.0 - g[n-1] # b[n-1] - a[n-1]*g[n-1]
-    x[n-1] = (rx[n-1] - x[n-2])/bet
-    y[n-1] = (ry[n-1] - y[n-2])/bet
-    z[n-1] = (1.0 - z[n-2])/bet
+        bb[i] = 4.0 - 1.0/bb[i-1]       # bb[i] =  b[i] - c[i-1]*a[i]/bb[i-1]
+        x[i] = rx[i] - x[i-1]/bb[i-1]   #  x[i] = rx[i] - x[i-1]*a[i]/bb[i-1]
+        y[i] = ry[i] - y[i-1]/bb[i-1]   #  y[i] = ry[i] - y[i-1]*a[i]/bb[i-1]
+        z[i] = 0.0 - z[i-1]/bb[i-1]     #  z[i] =  u[i] - z[i-1]*a[i]/bb[i-1]
+    bb[n-1] = 3.0 - 1/bb[n-2]           # bb[n-1] =  b[n-1] - c[n-2]*a[n-1]/bb[n-2]
+    x[n-1] = rx[n-1] - x[n-2]/bb[n-2]   #  x[n-1] = rx[n-1] - c[n-2]*a[n-1]/bb[n-2]
+    y[n-1] = ry[n-1] - y[n-2]/bb[n-2]   #  y[n-1] = ry[n-1] - c[n-2]*a[n-1]/bb[n-2]
+    z[n-1] = 1.0 - z[n-2]/bb[n-2]
 
+    x[n-1] = x[n-1]/bb[n-1]             # x[n-1] = x[n-1]/bb[n-1]
+    y[n-1] = y[n-1]/bb[n-1]             # y[n-1] = y[n-1]/bb[n-1]
+    z[n-1] = z[n-1]/bb[n-1]             # z[n-1] = z[n-1]/bb[n-1]
     for i in range(n-2, -1, -1):
-        x[i] -= g[i+1]*x[i+1]
-        y[i] -= g[i+1]*y[i+1]
-        z[i] -= g[i+1]*z[i+1]
+        x[i] = (x[i] - x[i+1])/bb[i]    # x[i] = (x[i] - c[i]*x[i+1])/bb[i]
+        y[i] = (y[i] - y[i+1])/bb[i]    # y[i] = (y[i] - c[i]*y[i+1])/bb[i]
+        z[i] = (z[i] - z[i+1])/bb[i]    # z[i] = (z[i] - c[i]*z[i+1])/bb[i]
 
     d = 1 + z[0] + z[n-1]
     fx = (x[0] + x[n-1])/d
