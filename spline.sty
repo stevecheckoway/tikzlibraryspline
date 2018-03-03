@@ -160,17 +160,15 @@
 % TikZ's normal behavior for (A) .. controls (B) and (C) .. (D) when one of
 % (A) or (D) is s node is not great, but it's okay. For the spline, it looks
 % terrible.
-\RequirePackage{tikz}
-\RequirePackage{trace}
 
 \usepgflibrary{intersections}
 
 \newif\iftikz@spline@closed
 \newif\iftikz@spline@usetime
-\newif\iftikz@spline@coordinates
 \newcount\tikz@spline@i
 
 \let\tikz@spline@debug=\pgfutil@gobble
+\let\tikz@spline@name=\relax
 
 \tikzset{
   spline through/.style={%
@@ -191,7 +189,8 @@
     }%
   },%
   closed spline through/.value required,
-  spline coordinates/.is if=tikz@spline@coordinates,
+  spline coordinates/.store in=\tikz@spline@name,
+  spline coordinates/.default=spline,
   spline debug/.store in=\tikz@spline@debug,
   spline debug/.default=\typeout
 }
@@ -273,7 +272,7 @@
   % Step 5. Add the bezier curve segments to the path.
   \tikz@spline@path
   % Step 6. Optionally add coordinates for the control and knot points.
-  \iftikz@spline@coordinates
+  \ifx\tikz@spline@name\relax\else
     \tikz@spline@i=0
     \tikz@spline@coordinates
     \xdef\tikzsplinesegments{\number\tikz@spline@segments}%
@@ -802,18 +801,15 @@
   \tikz@spline@get@K{\tikz@spline@i}%
   \tikz@spline@get@C{\tikz@spline@i}%
   \advance\tikz@spline@i by1
+  \def\tikz@temp##1{\tikz@spline@name\space ##1-\the\tikz@spline@i}%
   \edef\tikz@marshal{%
-    node[shape=coordinate,%
-      \ifx\tikz@shapeborder@name\relax
-        at={(\the\pgf@x,\the\pgf@y)}%
-      \else
-        at={(\tikz@shapeborder@name)}%
-      \fi,%
-      name={spline K-\the\tikz@spline@i}]{}%
-    node[shape=coordinate,at={(\the\pgf@xa,\the\pgf@ya)},%
-      name={spline P-\the\tikz@spline@i}]{}%
-    node[shape=coordinate,at={(\the\pgf@xb,\the\pgf@yb)},%
-      name={spline Q-\the\tikz@spline@i}]{}%
+    \ifx\tikz@shapeborder@name\relax
+      node[shape=coordinate](\tikz@temp{K})at(\the\pgf@x,\the\pgf@y){}%
+    \else
+      node also[alias={\tikz@temp{K}}](\tikz@shapeborder@name)%
+    \fi
+    node[shape=coordinate](\tikz@temp{P})at(\the\pgf@xa,\the\pgf@ya){}%
+    node[shape=coordinate](\tikz@temp{Q})at(\the\pgf@xb,\the\pgf@yb){}%
   }%
   \expandafter\endpgfextra\tikz@marshal
   \pgfextra
@@ -825,13 +821,11 @@
     \fi
     \advance\tikz@spline@i by1
     \edef\tikz@marshal{%
-      node[shape=coordinate,%
-        \ifx\tikz@shapeborder@name\relax
-          at={(\the\pgf@x,\the\pgf@y)}%
-        \else
-          at={(\tikz@shapeborder@name)}%
-        \fi,%
-        name={spline K-\the\tikz@spline@i}]{}%
+      \ifx\tikz@shapeborder@name\relax
+        node[shape=coordinate](\tikz@temp{K})at(\the\pgf@x,\the\pgf@y){}%
+      \else
+        node also[alias={\tikz@temp{K}}](\tikz@shapeborder@name)%
+      \fi
     }%
     \expandafter\endpgfextra\tikz@marshal
     \pgfextra
