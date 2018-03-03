@@ -165,6 +165,13 @@
 
 \usepgflibrary{intersections}
 
+\newif\iftikz@spline@closed
+\newif\iftikz@spline@usetime
+\newif\iftikz@spline@coordinates
+\newcount\tikz@spline@i
+
+\let\tikz@spline@debug=\pgfutil@gobble
+
 \tikzset{
   spline through/.style={%
     to path={%
@@ -184,15 +191,10 @@
     }%
   },%
   closed spline through/.value required,
+  spline coordinates/.is if=tikz@spline@coordinates,
   spline debug/.store in=\tikz@spline@debug,
   spline debug/.default=\typeout
 }
-
-\newif\iftikz@spline@closed
-\newif\iftikz@spline@usetime
-\newcount\tikz@spline@i
-
-\let\tikz@spline@debug=\pgfutil@gobble
 
 % Helpers
 \def\tikz@spline@save@C#1{%
@@ -270,6 +272,12 @@
   \tikz@spline@computeQ
   % Step 5. Add the bezier curve segments to the path.
   \tikz@spline@path
+  % Step 6. Optionally add coordinates for the control and knot points.
+  \iftikz@spline@coordinates
+    \tikz@spline@i=0
+    \tikz@spline@coordinates
+    \xdef\tikzsplinesegments{\number\tikz@spline@segments}%
+  \fi
   % Done!
   \endpgfextra
 }
@@ -790,5 +798,46 @@
   \pgftransformcurveattime{\tikz@spline@time}{\tikz@spline@zeroth}{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
 }
 
+\def\tikz@spline@coordinates{%
+  \tikz@spline@get@K{\tikz@spline@i}%
+  \tikz@spline@get@C{\tikz@spline@i}%
+  \advance\tikz@spline@i by1
+  \edef\tikz@marshal{%
+    node[shape=coordinate,%
+      \ifx\tikz@shapeborder@name\relax
+        at={(\the\pgf@x,\the\pgf@y)}%
+      \else
+        at={(\tikz@shapeborder@name)}%
+      \fi,%
+      name={spline K-\the\tikz@spline@i}]{}%
+    node[shape=coordinate,at={(\the\pgf@xa,\the\pgf@ya)},%
+      name={spline P-\the\tikz@spline@i}]{}%
+    node[shape=coordinate,at={(\the\pgf@xb,\the\pgf@yb)},%
+      name={spline Q-\the\tikz@spline@i}]{}%
+  }%
+  \expandafter\endpgfextra\tikz@marshal
+  \pgfextra
+  \ifnum\tikz@spline@i=\tikz@spline@segments
+    \iftikz@spline@closed
+      \tikz@spline@get@K{0}%
+    \else
+      \tikz@spline@get@K{\tikz@spline@i}%
+    \fi
+    \advance\tikz@spline@i by1
+    \edef\tikz@marshal{%
+      node[shape=coordinate,%
+        \ifx\tikz@shapeborder@name\relax
+          at={(\the\pgf@x,\the\pgf@y)}%
+        \else
+          at={(\tikz@shapeborder@name)}%
+        \fi,%
+        name={spline K-\the\tikz@spline@i}]{}%
+    }%
+    \expandafter\endpgfextra\tikz@marshal
+    \pgfextra
+  \else
+    \expandafter\tikz@spline@coordinates
+  \fi
+}
 \endinput
 % vim: set sw=2 sts=2 ts=8 et nospell:

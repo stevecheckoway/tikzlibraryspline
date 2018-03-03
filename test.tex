@@ -2,17 +2,32 @@
 \usepackage{tikz}
 \usepackage{spline}
 
-\usetikzlibrary{intersections}
+\usetikzlibrary{calc}
 
 \tikzset{spline debug}
 \errorcontextlines8
+
+\newcommand*\showcontrols{[%
+  spline coordinates,
+  execute at end to={%
+    {%
+    \foreach \i in {1,2,...,\tikzsplinesegments}{%
+      \draw[black,-] let \n0={\i+1} in
+        (spline K-\i) -- (spline P-\i)
+        (spline Q-\i) -- (spline K-\n0);
+      \fill[green!50!black] (spline P-\i) circle (1pt);
+      \fill[red] (spline Q-\i) circle (1pt);
+    };%
+    }%
+  }%
+]}
 
 \begin{document}
 \begin{tikzpicture}
 \draw[help lines] (0,0) grid (3,3);
 \node[draw, circle, outer sep=1pt] (A) at (0,1) {A};
-\draw[red, <-, shorten <=1pt]  (A) to[spline through={(3,1)(2,3)}] (1.5,0);
-%\draw[yshift=.2cm,blue] (0,1) to[spline through={++(3,0)++(-1,2)++(-.5,-3)}] ++(0,0);
+\draw[red, <-, shorten <=1pt] (A) to[spline through={(3,1)(2,3)}] (1.5,0);
+\draw[yshift=.2cm,blue] (0,1) to[append after command={[draw,dashed]},spline through={++(3,0)++(-1,2)++(-.5,-3)}] ++(0,0);
 \draw[black, ->] (A) edge[closed spline through={+(3,0)+(2,2)+(1.5,-1)}] +(0,0);
 \end{tikzpicture}
 % 
@@ -81,12 +96,13 @@
 \coordinate (start) at (0,1);
 \coordinate (end) at (3,1);
 
-\draw[->] (start) to[spline through={(1,0)(1.5,3)(2,1)}] (end);
-\draw[red] (start)
-  .. controls (10.66978pt,5.08085pt) and (21.33955pt,-18.29105pt) .. (28.45274pt,0.00000pt)
-  .. controls (35.56593pt,18.29105pt) and (39.12252pt,78.24503pt) .. (42.67911pt,85.35822pt)
-  .. controls (46.23570pt,92.47141pt) and (49.79229pt,46.74379pt) .. (56.90548pt,28.45274pt)
-  .. controls (64.01866pt,10.16169pt) and (74.68844pt,19.30722pt) .. (end);
+\draw[blue, ->] \showcontrols
+    (start) edge[spline through={(1,0)(1.5,3)(2,1)}] (end);
+%\draw[red] (start)
+%  .. controls (10.66978pt,5.08085pt) and (21.33955pt,-18.29105pt) .. (28.45274pt,0.00000pt)
+%  .. controls (35.56593pt,18.29105pt) and (39.12252pt,78.24503pt) .. (42.67911pt,85.35822pt)
+%  .. controls (46.23570pt,92.47141pt) and (49.79229pt,46.74379pt) .. (56.90548pt,28.45274pt)
+%  .. controls (64.01866pt,10.16169pt) and (74.68844pt,19.30722pt) .. (end);
 \end{tikzpicture}
 
 % \begin{tikzpicture}
