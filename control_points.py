@@ -143,11 +143,11 @@ if __name__ == '__main__':
         (3,1),
         (2,3),
         (1.5,0),
-        (0,1)
+        #(0,1)
     ]
     print("spline_through:")
     spline_through(points, cyclic=False)
-    #print("\nclosed_spline_through:")
-    #spline_through(points, cyclic=True)
+    print("\nclosed_spline_through:")
+    spline_through(points, cyclic=True)
 
 # vim: set sw=4 sts=4 ts=8 et tw=0:

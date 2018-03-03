@@ -534,9 +534,9 @@
   \advance\pgf@xc by1pt
   \advance\pgf@xa by\pgf@xb
   \advance\pgf@ya by\pgf@yb
-  \pgf@counta=\pgf@xc
-  \pgf@xc=\dimexpr\pgf@xa*65536/\pgf@counta\relax
-  \pgf@yc=\dimexpr\pgf@ya*65536/\pgf@counta\relax
+  \c@pgf@counta=\pgf@xc
+  \pgf@xc=\dimexpr\pgf@xa*65536/\c@pgf@counta\relax
+  \pgf@yc=\dimexpr\pgf@ya*65536/\c@pgf@counta\relax
   \edef\tikz@spline@fx{\pgf@sys@tonumber\pgf@xc}%
   \edef\tikz@spline@fy{\pgf@sys@tonumber\pgf@yc}%
   \tikz@spline@i=\tikz@spline@segments
@@ -576,12 +576,7 @@
     \pgf@yb=2\pgf@y
     \advance\pgf@xb by-\pgf@xa
     \advance\pgf@yb by-\pgf@ya
-    \tikz@spline@save@C{\tikz@spline@i}{%
-      \pgf@xa=\the\pgf@xa
-      \pgf@ya=\the\pgf@ya
-      \pgf@xb=\the\pgf@xb
-      \pgf@yb=\the\pgf@yb
-    }%
+    \tikz@spline@get@C{\tikz@spline@i}%
   \else
     % Q[n-1] = (K[n] + P[n-1])/2
     \tikz@spline@get@K{\tikz@spline@i}%
@@ -593,13 +588,17 @@
     \advance\pgf@yb by\pgf@ya
     \divide\pgf@xb by2
     \divide\pgf@yb by2
-    \tikz@spline@save@C{\tikz@spline@i}{%
-      \pgf@xa=\the\pgf@xa
-      \pgf@ya=\the\pgf@ya
-      \pgf@xb=\the\pgf@xb
-      \pgf@yb=\the\pgf@yb
-    }%
   \fi
+  \tikz@spline@save@C{\tikz@spline@i}{%
+    \pgf@xa=\the\pgf@xa
+    \pgf@ya=\the\pgf@ya
+    \pgf@xb=\the\pgf@xb
+    \pgf@yb=\the\pgf@yb
+  }%
+  \tikz@spline@debug{%
+    P[\the\tikz@spline@i]=(\the\pgf@xa,\the\pgf@ya)
+    Q[\the\tikz@spline@i]=(\the\pgf@xb,\the\pgf@yb)%
+  }%
   \tikz@spline@computeQA
 }
 
@@ -612,11 +611,16 @@
   \advance\pgf@xb by-\pgf@xa
   \advance\pgf@yb by-\pgf@ya
   \advance\tikz@spline@i by-1
+  \tikz@spline@get@C{\tikz@spline@i}%
   \tikz@spline@save@C{\tikz@spline@i}{%
     \pgf@xa=\the\pgf@xa
     \pgf@ya=\the\pgf@ya
     \pgf@xb=\the\pgf@xb
     \pgf@yb=\the\pgf@yb
+  }%
+  \tikz@spline@debug{%
+    P[\the\tikz@spline@i]=(\the\pgf@xa,\the\pgf@ya)
+    Q[\the\tikz@spline@i]=(\the\pgf@xb,\the\pgf@yb)%
   }%
   \ifnum\tikz@spline@i=0\else
     \expandafter\tikz@spline@computeQA
@@ -659,7 +663,7 @@
   \def\tikz@spline@timea{0}%
   \def\tikz@spline@timeb{1}%
   \ifx\tikz@spline@startname\relax\else
-    \pgfutil@ifundefined{pgf@sh@bg@\csname pgf@sh@ns\tikz@spline@startname\endcsname}{}{%
+    \pgfutil@ifundefined{pgf@sh@bg@\csname pgf@sh@ns@\tikz@spline@startname\endcsname}{}{%
       % Defined.
       \tikz@spline@border@time{\tikz@spline@startname}{\tikz@spline@timea}{1}%
       \tikz@spline@usetimetrue
@@ -667,7 +671,7 @@
   \fi
   % Check for an end shape
   \ifx\tikz@spline@endname\relax\else
-    \pgfutil@ifundefined{pgf@sh@bg@\csname pgf@sh@ns\tikz@spline@endname\endcsname}{}{%
+    \pgfutil@ifundefined{pgf@sh@bg@\csname pgf@sh@ns@\tikz@spline@endname\endcsname}{}{%
       \tikz@spline@border@time{\tikz@spline@endname}{\tikz@spline@timeb}{\pgfintersectionsolutions}%
       \tikz@spline@usetimetrue
     }%
