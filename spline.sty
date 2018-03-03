@@ -171,6 +171,7 @@
       \pgfextra
       \tikz@spline@closedfalse
       \tikz@splinethrough{(\tikztostart)#1(\tikztotarget)}%
+      \tikztonodes
     },%
   },
   spline through/.value required,
@@ -179,6 +180,7 @@
       \pgfextra
       \tikz@spline@closedtrue
       \tikz@splinethrough{(\tikztostart)#1}%
+      \tikztonodes
     }%
   },%
   closed spline through/.value required,
@@ -248,7 +250,6 @@
       \edef\tikz@next{%
         \noexpand\endpgfextra
         --(\the\tikz@lastx,\the\tikz@lasty)%
-        \noexpand\pgfextra
       }%
     \fi
   \else
@@ -269,6 +270,8 @@
   \tikz@spline@computeQ
   % Step 5. Add the bezier curve segments to the path.
   \tikz@spline@path
+  % Done!
+  \endpgfextra
 }
 
 % Look up the new b (which we're calling bb) values in our table. Read the
@@ -778,12 +781,13 @@
   % Compute scaled and shifted time
   \pgf@xa=\pgf@sys@tonumber{\pgf@yb}\pgf@xa
   \advance\pgf@xa by\pgf@xb
-  \pgf@process{%
-    \edef\tikz@spline@time{\pgf@sys@tonumber{\pgf@xa}}
-    % Get the appropriate control points for the segment
-    \tikz@spline@select@segment{\tikz@spline@i}%
-    \pgftransformcurveattime{\tikz@spline@time}{\tikz@spline@zeroth}{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
+  \edef\tikz@spline@time{\pgf@sys@tonumber{\pgf@xa}}
+  % Get the appropriate control points for the segment
+  \tikz@spline@select@segment{\tikz@spline@i}%
+  \tikz@spline@debug{%
+    \string\tikz@time=\tikz@time\space -> \the\tikz@spline@i.\tikz@spline@time
   }%
+  \pgftransformcurveattime{\tikz@spline@time}{\tikz@spline@zeroth}{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
 }
 
 \endinput
