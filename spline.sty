@@ -1,3 +1,165 @@
+% This library computes cubic bezier splines through some given points K[0],
+% K[1], ..., K[n]. In the case of a closed curve, the user specifies only
+% K[0], K[1], ..., K[n-1] and K[n] is taken to be K[0].
+%
+% A spline (for our purposes) is a piecewise cubic curve consisting of n
+% cubic curves connected where segment i starts at point K[i] and ends at
+% point K[i+1].
+%
+% This code and documentation uses the term "knot" to refer to the K[i].
+% Traditionally, a knot refers to "time" values, one of the t[0], t[1], ...,
+% t[n] values such that S[t[i]] = K[i]. Hopefully, this won't cause too much
+% confusion.
+%
+% The bezier curve control points are calculated by writing the parametric
+% equations of each cubic curve and constraining the first and second
+% derivatives.
+%
+% Specifically, we have the n functions
+%
+%    f_i(t) = (1-t)^3 K[i] + (1-t)^2 t P[i] + (1-t)t^2 Q[i] + t^3 K[i+1]
+%
+% for i in {0,1,...,n-1} and 0 <= t <= 1. For a closed spline, K[n] = K[0].
+%
+% For a closed curve, we construct 2n equations in 2n variables by
+% requiring differentiating and setting f_{i+1}'(0) = f_i'(1) and
+% f_{i+1}''(0) = f_i''(1).
+%
+% Otherwise, we have 2n-2 equations of that form for the interior knot points.
+% By setting f_0''(0) = 0 and f_{n-1}''(1) = 0, we get a total of 2n
+% functions.
+%
+% By some simple algebraic substitution, we can make a system of n equations
+% in P[0], P[1], ..., P[n-1]. In the closed case, we have
+%
+%     P[i-1] + 4P[i] + P[i+1] = 4K[i] + 2K[i+1].
+%
+% where all indices are taken modulo n. This leads to the linear system AP = R
+% where R is the vector of values from the RHS and
+%
+%    A = [4 1       1
+%         1 4 1
+%           1 4 1
+%               ...
+%         1       1 4]
+%
+% We can solve this linear system in linear time by using the Sherman-Morrison
+% formula. In essence, we compute A'P = R, A'z = u where
+%
+%    A' = [3 1
+%          1 4 1
+%            1 4 1
+%                ...
+%                  1 3], and
+%     u = [1 0 ... 0 1]^T.
+%
+% This choice of u is unusual but works well with the fixed point numbers
+% we're working with.
+%
+% Finally, if x[i] and y[i] are the coordinates of P[i], we compute
+%
+%    fx = (x[0] + x[n-1])/(1 + z[0] + z[n-1]), and
+%    fy = (y[0] + y[n-1])/(1 + z[0] + z[n-1]).
+% 
+% and finally update P[i] by setting
+%
+%    x[i] <- x[i] - fx*z[i]
+%    y[i] <- y[i] - fy*z[i].
+%
+% This gives us the first control point for each segment. From the curve
+% equations, we get
+%
+%    Q[i] = 2K[i+1] - P[i+1]
+%
+% where again, the indices are taken modulo n.
+%
+% The situation for the non-closed case is simpler. We have the system of n
+% equations in P[0], P[1], ..., P[n-1].
+%
+%               2P[0]    + P[1]   =  K[0]   + 2K[1]
+%      P[i-1] + 4P[i]    + P[i+1] = 2K[i]   + 2K[i+1]  for 0 < i < n-1
+%     2P[n-2] + 7P[n-1]           = 8K[n-1] + K[n].
+%
+% This leads to the linear equation BP = R where elements of R are again the
+% RHS of the equations and
+%
+%    B = [2 1
+%         1 4 1
+%           1 4 1
+%               ...
+%                 2 7].
+% 
+% Solving for P gives us the first control point of each segment. The second
+% control point Q[i] can be computed via
+%
+%    Q[i]   = 2K[i+1] - P[i+1] for 0 <= i < n-1
+%    Q[n-1] = (K[n] + P[n-1])/2.
+%
+% That just leaves us with the task of solving these linear systems. Note that
+% both A' and B are diagonally dominant tridiagonal matrices. We can solve
+% these using the Thomas algorithm.
+%
+% In general, a tridiagonal matrix has the form
+%    [b[0] c[0]
+%     a[1] b[1] c[1]
+%          a[2] b[2] c[2]
+%                       ...
+%                         a[n-1] b[n-1]].
+% In our case,
+%
+%    a[i]   = 1 for 0 <= i < n-1
+%    a[n-1] = 1 if the spline is closed, otherwise 2
+%    b[0]   = 3 if the spline is closed, otherwise 2
+%    b[i]   = 4 for 1 <= i < n-1
+%    b[n-1] = 3 if the spline is closed, otherwise 7
+%    c[i]   = 1 for 0 <= i <= n-1
+%
+% There are several variants of the algorithm. This performs the following
+% steps.
+%
+% First, the elements below the main diagonal are eliminated by iterating over
+% each row i > 0 and replacing it with an appropriate linear combination with
+% the previous row. That is, for i=1 up to i=n-1,
+%
+%    b[i] <- b[i] - a[i]c[i-1]/b[i-1]
+%    R[i] <- R[i] - a[i]R[i-1]/b[i-1]
+%    u[i] <- u[i] - a[i]u[i-1]/b[i-1] for the closed spline case.
+%
+% Note that this can be simplified since iterations i=1 through i=n-2
+% all have a[i] = 1, b[i] = 4, c[i] = 1, and u[i] = 0.
+%
+% In fact, the modified b[i] is a function of b[0] (which is either 3 or 2)
+% and can be computed via the recurrance b[i] = 4 - 1/b[i]. This converges to
+% 2+sqrt(3) regardless of b[0]. For b[0] = 2 or 3, and i > 6, b[i] - b[6] is
+% smaller than we can represent. Thus, we can just have a look up table for
+% the first 7 values for each of the two starting conditions.
+%
+% once the lower diagonal has been eliminated, back substitution gives our
+% solutions. That is,
+%
+%    P[n-1] = R[n-1]/b[n-1]
+%    z[n-1] = u[n-1]/b[n-1]
+%
+% and for i=n-2 down to i=0,
+%
+%    P[i] = (R[i] - c[i]P[i+1])/b[i]
+%    z[i] = (u[i] - c[i]z[i+1])/b[i].
+%
+% Again, we have c[i] = 1 and can look b[i] up in a table.
+%
+% That's the whole algorithm.
+%
+% Once we have the control points P[i] and Q[i], we can use pgf to add the
+% cublic curve which in pseudo-TikZ notation is:
+%
+%    .. controls P[i] and Q[i] .. K[i+1]
+%
+% If nodes are used as knot points, the intersections library is used to
+% compute the intersection point between the shape's background path and the
+% curve and pgf is used to add just the segment of the curve that's visible.
+% TikZ's normal behavior for (A) .. controls (B) and (C) .. (D) when one of
+% (A) or (D) is s node is not great, but it's okay. For the spline, it looks
+% terrible.
 \RequirePackage{tikz}
 \RequirePackage{trace}
 
@@ -6,56 +168,466 @@
 \tikzset{
   spline through/.style={%
     to path={%
-      \pgfextra{\tikz@splinethrough{(\tikztostart)#1(\tikztotarget)}}%
-      \tikztonodes
+      \pgfextra
+      \tikz@splineclosedfalse
+      \tikz@splinethrough{(\tikztostart)#1(\tikztotarget)}%
     },%
   },
   spline through/.value required,
+  closed spline through/style={%
+    to path={%
+      \pgfextra
+      \tikz@splineclosedtrue
+      \tikz@splinethrough{(\tikztostart)#1}%
+    }%,
+  },%
+  closed spline through/.value required,
   spline debug/.store in=\tikz@spline@debug,
   spline debug/.default=\typeout,
 }
 
-\newcount\tikz@spline@segments
+\newif\iftikz@splineclosed
+\newcount\tikz@spline@i
 
 \let\tikz@spline@debug=\pgfutil@gobble
 
-\def\tikz@splinethrough#1{%
-  % Parse the points, including the start and end, in reverse
-  \pgfintersectionsortbyfirstpath
-  \let\tikz@spline@temp=\pgfutil@empty
-  \tikz@spline@segments=-1
-  \tikz@spline@parse@points#1\pgf@stop
-  \c@pgf@countc=\tikz@spline@segments
-  \advance\c@pgf@countc by-1
-  \mathchardef\tikz@spline@max@interior@point\c@pgf@countc
-  % Compute the r_i
-  \c@pgf@countc=0
-  \expandafter\tikz@spline@compute@r\tikz@spline@temp
-  \expandafter\tikz@spline@compute@segments\tikz@spline@temp
-  \tikz@spline@path
-  \let\tikz@timer=\tikz@timer@spline
+% Helpers
+\def\tikz@spline@save@C#1{%
+  \expandafter\edef\csname tikz@spline@C\number#1\endcsname
 }
 
-\def\tikz@spline@parse@points{%
+\def\tikz@spline@get@C#1{%
+  \csname tikz@spline@C\number#1\endcsname
+}
+
+\def\tikz@spline@save@K#1{%
+  \expandafter\edef\csname tikz@spline@K\number#1\endcsname
+}
+
+\def\tikz@spline@get@K#1{%
+  \csname tikz@spline@K\number#1\endcsname
+}
+
+% Start the spline construction process.
+\def\tikz@splinethrough#1{%
+  % Step 1. Parse all of the knots.
+  \tikz@spline@i=0
+  \tikz@scan@one@point\tikz@spline@knot#1\pgf@stop
+}
+
+% Handle a knot by saving the coordinates and the name.
+\def\tikz@spline@knot#1{%
+  \tikz@make@last@position{#1}%
+  \tikz@spline@debug{Parsed point: (\the\tikz@lastx,\the\tikz@lasty) \detokenize{#1}}%
+  \tikz@spline@save@K{\tikz@spline@segments}{%
+    \pgf@x=\the\tikz@lastx
+    \pgf@y=\the\tikz@lasty
+    \iftikz@shapeborder
+      \def\noexpand\tikz@shapeborder@name{\tikz@shapeborder@name}%
+    \else
+      \let\noexpand\tikz@shapeborder@name\relax
+    \fi
+  }%
+  \advance\tikz@spline@i by1
   \pgfutil@ifnextchar\pgf@stop{%
-    \pgfutil@gobble 
+    \tikz@spline@check@knots
   }{%
-    \tikz@scan@one@point\tikz@spline@handle@point
+    \tikz@scan@one@point\tikz@spline@knot
   }%
 }
 
-% Append the point as x,y/node name& to \tikz@spline@temp
-\def\tikz@spline@handle@point#1{%
-  \tikz@make@last@position{#1}%
-  \tikz@spline@debug{Parsed point: (\the\tikz@lastx,\the\tikz@lasty) \detokenize{#1}}
-  \iftikz@shapeborder
-    \edef\tikz@spline@temp{\tikz@spline@temp\the\tikz@lastx,\the\tikz@lasty/\tikz@shapeborder@name&}%
+% Check if we can proceed with the spline contruction.
+\def\tikz@spline@check@knots\pgf@stop{%
+  % Step 2. Make sure that a closed spline has at least three knots. If the
+  % spline is not closed, then we have one fewer segments than knots.
+  \let\tikz@next=\tikz@splinethroughA
+  \iftikz@splineclosed
+    \ifnum\tikz@spline@i<3
+      \tikzerror{Closed splines require at least three points}%
+      \edef\tikz@next{%
+        \noexpand\endpgfextra
+        --(\the\tikz@lastx,\the\tikz@lasty)%
+        \pgfextra
+      }%
+    \fi
   \else
-    \edef\tikz@spline@temp{\tikz@spline@temp\the\tikz@lastx,\the\tikz@lasty/&}%
+    % If the curve is not closed, there are n-1 segments with n knots
+    \advance\tikz@spline@i by-1
   \fi
-  \advance\tikz@spline@segments by1
-  \tikz@spline@parse@points
+  % Keep track of how many bezier curve segments we'll be creating.
+  \mathchardef\tikz@spline@segments=\tikz@spline@i
+  \tikz@next
 }
+
+% Continue the spline construction.
+\def\tikz@splinethroughA{%
+  % Step 3. Compute the control points P[i].
+  \tikz@spline@computeP
+  % Step 4. Compute the control points Q[i].
+  \tikz@spline@computeQ
+  % Step 5. Add the bezier curve segments to the path.
+  \tikz@spline@path
+}
+
+% Step 3. Compute the control points P[i] by solving AP = R.
+\def\tikz@spline@computeP{%
+  % Perform the first step of the forward sweep of solving the tridiagonal (or
+  % cyclic) matrix equation.
+  % XXX: Explain algorithm.
+  \tikz@spline@get@K{0}%
+  \iftikz@splineclosed
+    % R[0] = K[0] + 2*K[1]
+    \pgf@xa=\pgf@x
+    \pgf@ya=\pgf@y
+  \else
+    % R[0] = 4K[0] + 2K[1]
+    \pgf@xa=4\pgf@x
+    \pgf@ya=4\pgf@y
+  \fi
+  \tikz@spline@get@K{1}%
+  \advance\pgf@xa by2\pgf@x
+  \advance\pgf@ya by2\pgf@y
+  % x[0] = rx[0]
+  % y[0] = ry[0]
+  % z[0] = 1
+  \tikz@spline@save@C{0}{%
+    \pgf@xa=\the\pgf@xa
+    \pgf@ya=\the\pgf@ya
+    \pgf@xc=1pt
+  }%
+  \tikz@spline@lookup@bb
+  \tikz@spline@i=1
+  \c@pgf@countc=2
+  \tikz@spline@computePA
+}
+
+% Step 3a. Handle all forward sweeping steps up to segments-2.
+\def\tikz@spline@computePA{%
+  % At this point,
+  % \pgf@x/\pgf@y = K[i]
+  % \pgf@xa/\pgf@ya = P[i-1]
+  % \pgf@xc = z[i-1]
+  % \c@pgf@counta/\c@pgf@countb = bb[i-1]
+  %
+  % R[i] = 4*K[i] + 2*K[i+1]
+  \pgf@xb=4\pgf@x
+  \pgf@yb=4\pgf@y
+  \tikz@spline@get@K{\c@pgf@countc}%
+  \advance\pgf@xb by2\pgf@x
+  \advance\pgf@yb by2\pgf@y
+  % P[i] = R[i] - P[i-1]/bb[i-1]
+  % z[i] = 0 - z[i-1]/bb[i-1]
+  \pgf@xa=\dimexpr\pgf@xb-\pgf@xa*\c@pgf@countb/\c@pgf@counta\relax
+  \pgf@ya=\dimexpr\pgf@yb-\pgf@ya*\c@pgf@countb/\c@pgf@counta\relax
+  \pgf@xc=\dimexpr-\pgf@xc*\c@pgf@countb/\c@pgf@counta\relax
+  \tikz@spline@save@C{\tikz@spline@i}{%
+    \pgf@xa=\the\pgf@xa
+    \pgf@ya=\the\pgf@ya
+    \pgf@xc=\the\pgf@xc
+  }%
+  \tikz@spline@lookup@bb
+  \advance\tikz@spline@i by1
+  \advance\c@pgf@countc by1
+  \ifnum\c@pgf@countc=\tikz@spline@segments
+    \expandafter\tikz@spline@computePB
+  \else
+    \expandafter\tikz@spline@computePA
+  \fi
+}
+
+
+% Step 3b. Handle the last iteration of the forward sweep and the first
+% iteration of the backwards substitution.
+\def\tikz@spline@computePB{%
+  % At this point,
+  % \pgf@x/\pgf@y = K[n-1]
+  % \pgf@xa/\pgf@ya = P[n-2]
+  % \pgf@xc = z[n-2]
+  % \c@pgf@counta/\c@pgf@countb = bb[n-2]
+  \iftikz@splineclosed\else
+    % a[n-1] = 2 so multiply the denominator of bb[n-2] by 2
+    \c@pgf@countb=2\c@pgf@countb
+  \fi
+  \pgf@xb=4\pgf@x
+  \pgf@yb=4\pgf@y
+  \tikz@spline@get@K{\c@pgf@countc}%
+  \pgf@xa=\dimexpr\pgf@xb-\pgf@xa*\c@pgf@countb/\c@pgf@counta\relax
+  \pgf@ya=\dimexpr\pgf@yb-\pgf@ya*\c@pgf@countb/\c@pgf@counta\relax
+  \pgf@xc=\dimexpr1pt-\pgf@xc*\c@pgf@countb/\c@pgf@counta\relax
+  % No need to save these since we're going to use them immediately.
+  %
+  % P[n-1] = P[n-1]/bb[n-1]
+  % z[n-1] = z[n-1]/bb[n-1]
+  \tikz@spline@lookup@bb
+  % Store P[n-1] in \pgf@xb/\pgf@yb and z[n-1] in \pgf@yc
+  \pgf@xb=\dimexpr\pgf@xa*\c@pgf@countb/\c@pgf@counta\relax
+  \pgf@yb=\dimexpr\pgf@ya*\c@pgf@countb/\c@pgf@counta\relax
+  \pgf@yc=\dimexpr\pgf@xc*\c@pgf@countb/\c@pgf@counta\relax
+  \tikz@spline@i=\c@pgf@countc
+  \tikz@spline@save@C{\tikz@spline@i}{%
+    \pgf@xa=\the\pgf@xb
+    \pgf@ya=\the\pgf@yb
+    \pgf@xc=\the\pgf@yc
+  }%
+  \def\tikz@next{\tikz@splinethroughE}%
+  \tikz@spline@computePC
+}
+
+% Step 3c. Handle all of the rest of the backwards substitutions.
+\def\tikz@spline@computePC{%
+  \advance\tikz@spline@i by-1
+  % At this point,
+  % \pgf@xb/\pgf@yb = P[i+1]
+  % \pgf@yc = z[i+1]
+  %
+  % P[i] = (P[i] - P[i+1])/bb[i]
+  % z[i] = (z[i] - z[i+1])/bb[i]
+  \tikz@spline@get@C{\tikz@spline@i}%
+  \pgf@xb=\dimexpr(\pgf@xa-\pgf@xb)*\c@pgf@countb/\c@pgf@counta\relax
+  \pgf@yb=\dimexpr(\pgf@ya-\pgf@yb)*\c@pgf@countb/\c@pgf@counta\relax
+  \pgf@yc=\dimexpr(\pgf@xc-\pgf@yc)*\c@pgf@countb/\c@pgf@counta\relax
+  \tikz@spline@save@C{\tikz@spline@i}{%
+    \pgf@xa=\the\pgf@xb
+    \pgf@ya=\the\pgf@yb
+    \pgf@xc=\the\pgf@yc
+  }%
+  \ifnum\tikz@spline@i=0
+    \tikz@spline@i=\tikz@spline@segments
+    \iftikz@splineclosed
+      % Goto step 3d.
+      \def\tikz@next{\tikz@spline@computePD}%
+    \else
+      % Goto step 3g.
+      \def\tikz@next{\tikz@spline@computePXXX}% probably PG
+    \fi
+  \fi
+  \tikz@next
+}
+
+% Step 3d. For a closed spline, compute the appropriate factor and then
+% multiply P[i] by the factor for each i.
+\def\tikz@spline@computePD{%
+  % d = 1 + z[0] + z[n-1]
+  % fx = (x[0] + x[n-1])/d
+  % fy = (y[0] + y[n-1])/d
+  \advance\tikz@spline@i by-1
+  \tikz@spline@get@C{\tikz@spline@i}%
+  \pgf@xb=\pgf@xa
+  \pgf@yb=\pgf@ya
+  \pgf@yc=\pgf@xc
+  \tikz@spline@get@C{0}%
+  \advance\pgf@xc by\pgf@yc
+  \advance\pgf@xc by1pt
+  \advance\pgf@xa by\pgf@xb
+  \advance\pgf@ya by\pgf@yb
+  \pgfutil@counta=\pgf@xc
+  \pgf@xc=\dimexpr\pgf@xa*65536/\pgfutil@counta\relax
+  \pgf@yc=\dimexpr\pgf@ya*65536/\pgfutil@counta\relax
+  \edef\tikz@spline@fx{\pgf@sys@tonumber\pgf@xc}%
+  \edef\tikz@spline@fy{\pgf@sys@tonumber\pgf@yc}%
+  \tikz@spline@i=\tikz@spline@segments
+  \tikz@spline@computePE
+}
+
+% Step 3e. For a closed spline only. Iterate through each segment and
+% modify P appropriately.
+\def\tikz@spline@computePE{%
+  \advance\tikz@spline@i by-1
+  \tikz@spline@get@C{\tikz@spline@i}%
+  % Px[i] = Px[i] - fx*z[i]
+  % Py[i] = Py[i] - fy*z[i]
+  \advance\pgf@xa by-\tikz@spline@fx\pgf@xc
+  \advance\pgf@ya by-\tikz@spline@fy\pgf@xc
+  \tikz@spline@save@C{\tikz@spline@i}{%
+    \pgf@xa=\the\pgf@xa
+    \pgf@ya=\the\pgf@ya
+  }%
+  \ifnum\tikz@spline@i=0
+    \let\tikz@spline@fx=\@undefined
+    \let\tikz@spline@fy=\@undefined
+  \else
+    \expandafter\tikz@spline@computePE
+  \fi
+}
+
+% Step 4. Compute control points Q[i].
+\def\tikz@spline@computeQ{%
+  \tikz@spline@i=\tikz@spline@segments
+  \iftikz@splineclosed
+    % Q[n-1] = 2K[0] - P[0]
+    \advance\tikz@spline@i by-1
+    \tikz@spline@get@K{0}%
+    \tikz@spline@get@C{0}%
+    \pgf@xb=2\pgf@x
+    \pgf@yb=2\pgf@y
+    \advance\pgf@xb by-\pgf@xa
+    \advance\pgf@yb by-\pgf@ya
+    \tikz@spline@save@C{\tikz@spline@i}{%
+      \pgf@xa=\the\pgf@xa
+      \pgf@ya=\the\pgf@ya
+      \pgf@xb=\the\pgf@xb
+      \pgf@yb=\the\pgf@yb
+    }%
+  \else
+    % Q[n-1] = (K[n] + P[n-1])/2
+    \tikz@spline@get@K{\tikz@spline@i}%
+    \advance\tikz@spline@i by-1
+    \tikz@spline@get@C{\tikz@spline@i}%
+    \pgf@xb=\pgf@x
+    \pgf@yb=\pgf@y
+    \advance\pgf@xb by\pgf@xa
+    \advance\pgf@yb by\pgf@ya
+    \divide\pgf@xb by2
+    \divide\pgf@yb by2
+    \tikz@spline@saveC{\tikz@spline@i}{%
+      \pgf@xa=\the\pgf@xa
+      \pgf@ya=\the\pgf@ya
+      \pgf@xb=\the\pgf@xb
+      \pgf@yb=\the\pgf@yb
+    }%
+  \fi
+  \tikz@spline@computeQA
+}
+
+% Step 4a. Compute the rest of the Q[i] = 2K[i+1] - P[i+1]
+\def\tikz@spline@computeQA{%
+  \tikz@spline@get@K{\tikz@spline@i}%
+  \tikz@spline@get@C{\tikz@spline@i}%
+  \pgf@xb=2\pgf@x
+  \pgf@yb=2\pgf@y
+  \advance\pgf@xb by-\pgf@xa
+  \advance\pgf@yb by-\pgf@ya
+  \advance\tikz@spline@i by-1
+  \tikz@spline@save@C{\tikz@spline@i}{%
+    \pgf@xa=\the\pgf@xa
+    \pgf@ya=\the\pgf@ya
+    \pgf@xb=\the\pgf@xb
+    \pgf@yb=\the\pgf@yb
+  }%
+  \ifnum\tikz@spline@i=0\else
+    \expandafter\tikz@spline@computeQA
+  \fi
+}
+
+% Step 5. Add the bezier curve segments to the path.
+\def\tikz@spline@path{%
+  \tikz@spline@i=0
+  \tikz@spline@pathA
+}
+
+\def\tikz@spline@select@segment#1{%
+  \c@pgfutil@counta=#1\relax
+  \tikz@spline@get@K{\c@pgfutil@counta}%
+  \tikz@spline@get@C{\c@pgfutil@counta}%
+  \edef\tikz@spline@zeroth{\noexpand\pgfqpoint{\the\pgf@x}{\the\pgf@y}}%
+  \let\tikz@spline@startname=\tikz@shapeborder@name
+  \edef\tikz@spline@first{\noexpand\pgfqpoint{\the\pgf@xa}{\the\pgf@ya}}%
+  \edef\tikz@spline@second{\noexpand\pgfqpoint{\the\pgf@xb}{\the\pgf@yb}}%
+  \advance\c@pgfutil@counta by1
+  \ifnum\c@pgfutil@counta=\tikz@spline@segments
+    \iftikz@splineclosed
+      % The end knot is the start knot.
+      \c@pgfutil@counta=0
+    \fi
+  \fi
+  \tikz@spline@getK{\c@pgfutil@counta}%
+  \edef\tikz@spline@third{\noexpand\pgfqpoint{\the\pgf@x}{\the\pgf@y}}%
+  \let\tikz@spline@endname=\tikz@shapeborder@name
+}
+
+% Step 5a.
+\def\tikz@spline@pathA{%
+  \tikz@spline@select@segment{\tikz@spline@i}%
+  % If the start or end coordinates are shapes, calculate the intersection
+  % times.
+  \tikz@spline@usetimefalse
+  \def\tikz@spline@timea{0}%
+  \def\tikz@spline@timeb{1}%
+  \ifx\tikz@spline@startname\relax\else
+    \pgfutil@ifundefined{pgf@sh@bg@\csname pgf@sh@ns\tikz@spline@startname\endcsname}{}{%
+      % Defined.
+      \tikz@spline@border@time{\tikz@spline@startname}{\tikz@spline@timea}{1}%
+      \tikz@spline@usetimetrue
+    }%
+  \fi
+  % Check for an end shape
+  \ifx\tikz@spline@endname\relax\else
+    \pgfutil@ifundefined{pgf@sh@bg@\csname pgf@sh@ns\tikz@spline@endname\endcsname}{}{%
+      \tikz@spline@border@time{\tikz@spline@endname}{\tikz@spline@timeb}{\pgfintersectionsolutions}%
+      \tikz@spline@usetimetrue
+    }%
+  \fi
+  % If either end point was a shape, use \pgfpathcurvebetweentime to draw part
+  % of the curve.
+  \iftikz@spline@usetime
+    \pgfpathcurvebetweentime{\tikz@spline@timea}{\tikz@spline@timeb}%
+      {\tikz@spline@zeroth}{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
+  \else
+    \pgfpathcurveto{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
+  \fi
+  \ifnum\tikz@spline@i=0
+    % Save the start time for the timer.
+    \let\tikz@spline@starttime=\tikz@spline@timea
+  \fi
+  \advance\tikz@spline@i by1
+  \ifnum\tikz@spline@i=\tikz@spline@segments
+    \ifdim\tikz@spline@timeb pt<1pt
+      % \pgfpointcurveattime puts points on the tangent in xa/ya and xb/yb.
+      % XXX: This was computed from the intersection before, we could reuse
+      % it.
+      \pgfpointcurveattime{\tikz@spline@timeb}{\tikz@spline@zeroth}%
+        {\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
+      \edef\tikz@tangent{\noexpand\pgfqpoint{\the\pgf@xa}{\the\pgf@yb}}%
+      \tikz@make@last@position{}% \pgf@x/\pgf@y already contain the position.
+    \else
+      % The end point of the curve is the last position and the second control
+      % point is on the tangent.
+      \let\tikz@tangent=\tikz@spline@second
+      \tikz@make@last@position{\tikz@spline@third}%
+    \fi
+    \let\tikz@spline@endtime=\tikz@spline@timeb
+  \else
+    \expandafter\tikz@spline@pathA
+  \fi
+}
+
+% \def\tikz@splinethrough#1{%
+%   % Parse the points, including the start and end, in reverse
+%   \pgfintersectionsortbyfirstpath
+%   \let\tikz@spline@temp=\pgfutil@empty
+%   \tikz@spline@segments=-1
+%   \tikz@spline@parse@points#1\pgf@stop
+%   \c@pgf@countc=\tikz@spline@segments
+%   \advance\c@pgf@countc by-1
+%   \mathchardef\tikz@spline@max@interior@point\c@pgf@countc
+%   % Compute the r_i
+%   \c@pgf@countc=0
+%   \expandafter\tikz@spline@compute@r\tikz@spline@temp
+%   \expandafter\tikz@spline@compute@segments\tikz@spline@temp
+%   \tikz@spline@path
+%   \let\tikz@timer=\tikz@timer@spline
+% }
+% 
+% \def\tikz@spline@parse@points{%
+%   \pgfutil@ifnextchar\pgf@stop{%
+%     \pgfutil@gobble 
+%   }{%
+%     \tikz@scan@one@point\tikz@spline@handle@point
+%   }%
+% }
+% 
+% % Append the point as x,y/node name& to \tikz@spline@temp
+% \def\tikz@spline@handle@point#1{%
+%   \tikz@make@last@position{#1}%
+%   \tikz@spline@debug{Parsed point: (\the\tikz@lastx,\the\tikz@lasty) \detokenize{#1}}%
+%   \iftikz@shapeborder
+%     \edef\tikz@spline@temp{\tikz@spline@temp\the\tikz@lastx,\the\tikz@lasty/\tikz@shapeborder@name&}%
+%   \else
+%     \edef\tikz@spline@temp{\tikz@spline@temp\the\tikz@lastx,\the\tikz@lasty/&}%
+%   \fi
+%   \advance\tikz@spline@segments by1
+%   \tikz@spline@parse@points
+% }
 
 % This is computed by a simple recurrence
 % b_0 = 2
@@ -64,249 +636,249 @@
 % This converges to sqrt(3)+2 = 3.73205.
 % For i = n-1, the formula changes to b_i = 7 - 2/b_{i-1}
 % Sets \c@pgf@counta to the numerator and \c@pgf@countb to the denominator.
-\def\tikz@spline@compute@b{%
-  \ifnum\c@pgf@countc=\tikz@spline@max@interior@point
-    \advance\c@pgf@countc by-1
-    \tikz@spline@compute@b@raw
-    % Compute 7 - 2/b_{i-1}
-    \c@pgf@countc=\numexpr7*\c@pgf@counta-2*\c@pgf@countb\relax
-    \c@pgf@countb=\c@pgf@counta
-    \c@pgf@counta=\c@pgf@countc
-    \c@pgf@countc=\tikz@spline@max@interior@point
-  \else
-    \tikz@spline@compute@b@raw
-  \fi
-}
-
-\def\tikz@spline@compute@b@raw{%
-  \ifcase\c@pgf@countc
-    \c@pgf@counta=2
-    \c@pgf@countb=1
-  \or % b_1 = 7/2 = 3.5
-    \c@pgf@counta=7
-    \c@pgf@countb=2
-  \or % b_2 = 26/7 = 3.71429
-    \c@pgf@counta=26
-    \c@pgf@countb=7
-  \or % b_3 = 97/26 = 3.73077
-    \c@pgf@counta=97
-    \c@pgf@countb=26
-  \or % b_4 = 362/97 = 3.73196
-    \c@pgf@counta=362
-    \c@pgf@countb=97
-  \or % b_5 = 1351/362 = 3.73204
-    \c@pgf@counta=1351
-    \c@pgf@countb=362
-  \else % b_6 = 5042/1351 = 3.73205
-    % For i > 6, b_i - b_6 < 0.00000045
-    \c@pgf@counta=5042
-    \c@pgf@countb=1351
-  \fi
-}
-
-\newdimen\tikz@spline@x
-\newdimen\tikz@spline@y
-% \tikz@spline@compute@r kx_0,ky_0/name_1&...&kx_n,ky_n/name_n&
-% Defines \tikz@spline@temp to
-%   kx_n,ky_n/name_n&rx_{n-1},ry_{n-1}/kx_{n-1},ky_{n-1}/name_{n-1}&...&rx_0,ry_0/kx_0,ky_0/name_0&
-% Arguments: kx_i,ky_i/name_i&kx_{i+1},ky_{i+1}/name_{i+1}&
-% Prepends:  kx_{i+1},ky_{i+1}/name_{i+1}&rx_i,ry_i/ to \tikz@spline@temp
-\def\tikz@spline@compute@r#1,#2/#3&#4,#5/#6&{%
-  \ifnum0=\c@pgf@countc
-    % i = 0
-    % r_0 = k_0 + 2k_1
-    \tikz@spline@debug{\number\c@pgf@countc: k[i]=(#1,#2), k[i+1]=(#4,#5)}%
-    \tikz@spline@x=\dimexpr#1+#4*\tw@\relax
-    \tikz@spline@y=\dimexpr#2+#5*\tw@\relax
-    \tikz@spline@debug{\space\space\space r[i]=(\the\tikz@spline@x,\the\tikz@spline@y)}%
-    \edef\tikz@spline@temp{%
-      #4,#5/#6&%
-      \the\tikz@spline@x,\the\tikz@spline@y/%
-      #1,#2/#3&%
-    }%
-    \def\@next{\tikz@spline@compute@r#4,#5/#6&}%
-  \else\ifnum\c@pgf@countc=\tikz@spline@max@interior@point
-    % i = n-1
-    % r_{n-1} = 8k_{n-1} + k_n - r_{n-2}*2/b
-    \tikz@spline@debug{\number\c@pgf@countc: k[i]=(#1,#2), k[i+1]=(#4,#5),
-             b=\number\c@pgf@counta/\number\c@pgf@countb}%
-    \multiply\c@pgf@countb\tw@
-    \tikz@spline@x=\dimexpr#1*8+#4-\tikz@spline@x*\c@pgf@countb/\c@pgf@counta\relax
-    \tikz@spline@y=\dimexpr#2*8+#5-\tikz@spline@y*\c@pgf@countb/\c@pgf@counta\relax
-    \tikz@spline@debug{\space\space\space r[i]=(\the\tikz@spline@x,\the\tikz@spline@y)}%
-    \edef\tikz@spline@temp{%
-      #4,#5/#6&%
-      \the\tikz@spline@x,\the\tikz@spline@y/%
-      \tikz@spline@temp
-    }%
-    \let\@next=\relax
-  \else
-    % 0 < i < n-1
-    % r_i = 4k_i + 2k_{i+1} - r_{i-1}/b
-    \tikz@spline@debug{\number\c@pgf@countc: k[i]=(#1,#2), k[i+1]=(#4,#5),
-             b=\number\c@pgf@counta/\number\c@pgf@countb}%
-    \tikz@spline@x=\dimexpr#1*4+#4*\tw@-\tikz@spline@x*\c@pgf@countb/\c@pgf@counta\relax
-    \tikz@spline@y=\dimexpr#2*4+#5*\tw@-\tikz@spline@y*\c@pgf@countb/\c@pgf@counta\relax
-    \tikz@spline@debug{\space\space\space r[i]=(\the\tikz@spline@x,\the\tikz@spline@y)}%
-    \edef\tikz@spline@temp{%
-      #4,#5/#6&%
-      \the\tikz@spline@x,\the\tikz@spline@y/%
-      \tikz@spline@temp
-    }%
-    \def\@next{\tikz@spline@compute@r#4,#5/#6&}%
-  \fi\fi
-  \tikz@spline@compute@b
-  \advance\c@pgf@countc1
-  \@next
-}
-
-% kx_{i+1},ky_{i+1}/name_{i+1}&rx_i,ry_i/kx_i,ky_i/name_i&
-\def\tikz@spline@compute@segments#1,#2/#3&#4,#5/#6,#7/#8&{%
-  \advance\c@pgf@countc by-1
-  \tikz@spline@compute@b
-  \def\@next{\tikz@spline@compute@segments#6,#7/#8&}%
-  \ifnum\c@pgf@countc=\tikz@spline@max@interior@point
-    % i = n - 1
-    % p_{n-1} = r_{n-1}/b
-    % q_{n-1} = (k_n + p_{n-1})/2
-    \pgf@xa=\dimexpr#4*\c@pgf@countb/\c@pgf@counta\relax
-    \pgf@ya=\dimexpr#5*\c@pgf@countb/\c@pgf@counta\relax
-    \pgf@xb=\dimexpr(#1+\pgf@xa)/2\relax
-    \pgf@yb=\dimexpr(#2+\pgf@ya)/2\relax
-    \let\tikz@spline@temp\pgfutil@empty
-  \else\ifnum0=\c@pgf@countc
-    % i = 0
-    % p_0 = (r_0 - p_1)/2
-    % q_0 = 2k_1 - p_1
-    \pgf@xa=\dimexpr(#4-\pgf@xc)/2\relax
-    \pgf@ya=\dimexpr(#5-\pgf@yc)/2\relax
-    \pgf@xb=\dimexpr#1*2-\pgf@xc\relax
-    \pgf@yb=\dimexpr#2*2-\pgf@yc\relax
-    \let\@next=\relax
-  \else
-    % 0 < i < n-1
-    % p_i = (r_i - p_{i+1})/b
-    % q_i = 2k_{i+1} - p_{i+1}
-    \pgf@xa=\dimexpr(#4-\pgf@xc)*\c@pgf@countb/\c@pgf@counta\relax
-    \pgf@ya=\dimexpr(#5-\pgf@yc)*\c@pgf@countb/\c@pgf@counta\relax
-    \pgf@xb=\dimexpr#1*2-\pgf@xc\relax
-    \pgf@yb=\dimexpr#2*2-\pgf@yc\relax
-  \fi\fi
-  \tikz@spline@debug{\the\c@pgf@countc:
-    K[i]=(#6,#7),
-    K[i+1]=(#1,#2)^^J\space\space\space
-    r[i]=(#4,#5),
-    b=\number\c@pgf@counta/\number\c@pgf@countb^^J\space\space\space
-    P=(\the\pgf@xa,\the\pgf@ya),
-    Q=(\the\pgf@ya,\the\pgf@yb),
-  }%
-  \expandafter\edef\csname tikz@spline@s@\number\c@pgf@countc\endcsname{%
-    \def\noexpand\tikz@spline@zeroth{\noexpand\pgfqpoint{#6}{#7}}%
-    \def\noexpand\tikz@spline@first{\noexpand\pgfqpoint{\the\pgf@xa}{\the\pgf@ya}}%
-    \def\noexpand\tikz@spline@second{\noexpand\pgfqpoint{\the\pgf@xb}{\the\pgf@yb}}%
-    \def\noexpand\tikz@spline@third{\noexpand\pgfqpoint{#1}{#2}}%
-    \ifx\relax#8\relax
-      \let\noexpand\tikz@spline@start\relax
-    \else
-      \def\noexpand\tikz@spline@start{#8}%
-    \fi
-    \ifx\relax#3\relax
-      \let\noexpand\tikz@spline@end\relax
-    \else
-      \def\noexpand\tikz@spline@end{#3}%
-    \fi
-  }%
-  \pgf@xc=\pgf@xa
-  \pgf@yc=\pgf@ya
-  \@next
-}
-
-\def\tikz@spline@select#1{%
-  \csname tikz@spline@s@\number#1\endcsname
-}
-
-\def\tikz@spline@path{%
-  \c@pgf@countc=0
-  \tikz@spline@pathA
-  % Update some values for TikZ in case additional path components are added
-  \let\tikz@moveto@waiting=\tikz@spline@end
-}
-
-\newif\iftikz@spline@use@time
-
-% Loop over the segments and add each one to the current path
-\def\tikz@spline@pathA{%
-  \tikz@spline@select{\c@pgf@countc}%
-  \tikz@spline@third  \pgf@xc=\pgf@x \pgf@yc=\pgf@y
-  \tikz@spline@second \pgf@xb=\pgf@x \pgf@yb=\pgf@y
-  \tikz@spline@first  \pgf@xa=\pgf@x \pgf@ya=\pgf@y
-  \tikz@spline@zeroth
-  \tikz@spline@debug{Drawing (part of) the curve
-    (\the\pgf@x,\the\pgf@y) (\the\pgf@xa,\the\pgf@ya)
-    (\the\pgf@xb,\the\pgf@yb) (\the\pgf@xc,\the\pgf@yc)%
-  }%
-  % If the start or end coordinates are shapes, calculate the intersection
-  % times
-  \tikz@spline@use@timefalse
-  \def\tikz@spline@timea{0}%
-  \def\tikz@spline@timeb{1}%
-  % Check for start shape
-  \ifx\tikz@spline@start\relax\else
-    \pgfutil@ifundefined{pgf@sh@bg@\csname pgf@sh@ns@\tikz@spline@start\endcsname}{%
-    }{%
-      \tikz@spline@border@time{\tikz@spline@start}{\tikz@spline@timea}{1}%
-      \tikz@spline@use@timetrue
-    }%
-  \fi
-  % Check for end shape
-  \ifx\tikz@spline@end\relax\else
-    \pgfutil@ifundefined{pgf@sh@bg@\csname pgf@sh@ns@\tikz@spline@end\endcsname}{%
-    }{%
-      \tikz@spline@border@time{\tikz@spline@end}{\tikz@spline@timeb}{\pgfintersectionsolutions}%
-      \tikz@spline@use@timetrue
-    }%
-  \fi
-  % If either endpoint was a shape, use \pgfpathcurvebetweentime to draw just
-  % part of the curve.
-  \iftikz@spline@use@time
-    \tikz@spline@debug{\space\space\space\space from t=\tikz@spline@timea\space to
-      t=\tikz@spline@timeb}%
-    \pgfpathcurvebetweentime{\tikz@spline@timea}{\tikz@spline@timeb}{\tikz@spline@zeroth}%
-      {\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
-  \else
-    \pgfpathcurveto{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
-  \fi
-  \ifnum\c@pgf@countc=0
-    % Save the start time for the timer.
-    \let\tikz@spline@timer@start=\tikz@spline@timea
-  \fi
-  \advance\c@pgf@countc by1
-  \ifnum\c@pgf@countc<\tikz@spline@segments\relax
-    \expandafter\tikz@spline@pathA
-  \else
-    % Save the end time for the timer, set the last position, and the tangent.
-    \ifdim\tikz@spline@timeb pt<1pt
-      \begingroup
-      % \pgfpointcurveattime puts points on the tangent in xa/ya and xb/yb.
-      % XXX: This was computed from the intersection before, we could reuse it.
-      \pgfpointcurveattime{\tikz@spline@timeb}{\tikz@spline@zeroth}{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
-      \global\pgf@x=\pgf@x
-      \global\pgf@y=\pgf@y
-      \edef\tikz@marshal{%
-        \endgroup
-        \def\noexpand\tikz@tangent{\noexpand\pgfqpoint{\the\pgf@xa}{\the\pgf@ya}}%
-      }%
-      \tikz@marshal
-      \tikz@make@last@position{}% We already globally set \pgf@x/\pgf@y
-    \else
-      % The end point of the curve is the last position and the second control
-      % point is on the tangent.
-      \tikz@make@last@position{\tikz@spline@third}%
-      \let\tikz@tangent=\tikz@spline@second
-    \fi
-    \let\tikz@spline@timer@end=\tikz@spline@timeb
-  \fi
-}
+% \def\tikz@spline@compute@b{%
+%   \ifnum\c@pgf@countc=\tikz@spline@max@interior@point
+%     \advance\c@pgf@countc by-1
+%     \tikz@spline@compute@b@raw
+%     % Compute 7 - 2/b_{i-1}
+%     \c@pgf@countc=\numexpr7*\c@pgf@counta-2*\c@pgf@countb\relax
+%     \c@pgf@countb=\c@pgf@counta
+%     \c@pgf@counta=\c@pgf@countc
+%     \c@pgf@countc=\tikz@spline@max@interior@point
+%   \else
+%     \tikz@spline@compute@b@raw
+%   \fi
+% }
+% 
+% \def\tikz@spline@compute@b@raw{%
+%   \ifcase\c@pgf@countc
+%     \c@pgf@counta=2
+%     \c@pgf@countb=1
+%   \or % b_1 = 7/2 = 3.5
+%     \c@pgf@counta=7
+%     \c@pgf@countb=2
+%   \or % b_2 = 26/7 = 3.71429
+%     \c@pgf@counta=26
+%     \c@pgf@countb=7
+%   \or % b_3 = 97/26 = 3.73077
+%     \c@pgf@counta=97
+%     \c@pgf@countb=26
+%   \or % b_4 = 362/97 = 3.73196
+%     \c@pgf@counta=362
+%     \c@pgf@countb=97
+%   \or % b_5 = 1351/362 = 3.73204
+%     \c@pgf@counta=1351
+%     \c@pgf@countb=362
+%   \else % b_6 = 5042/1351 = 3.73205
+%     % For i > 6, b_i - b_6 < 0.00000045
+%     \c@pgf@counta=5042
+%     \c@pgf@countb=1351
+%   \fi
+% }
+% 
+% \newdimen\tikz@spline@x
+% \newdimen\tikz@spline@y
+% % \tikz@spline@compute@r kx_0,ky_0/name_1&...&kx_n,ky_n/name_n&
+% % Defines \tikz@spline@temp to
+% %   kx_n,ky_n/name_n&rx_{n-1},ry_{n-1}/kx_{n-1},ky_{n-1}/name_{n-1}&...&rx_0,ry_0/kx_0,ky_0/name_0&
+% % Arguments: kx_i,ky_i/name_i&kx_{i+1},ky_{i+1}/name_{i+1}&
+% % Prepends:  kx_{i+1},ky_{i+1}/name_{i+1}&rx_i,ry_i/ to \tikz@spline@temp
+% \def\tikz@spline@compute@r#1,#2/#3&#4,#5/#6&{%
+%   \ifnum0=\c@pgf@countc
+%     % i = 0
+%     % r_0 = k_0 + 2k_1
+%     \tikz@spline@debug{\number\c@pgf@countc: k[i]=(#1,#2), k[i+1]=(#4,#5)}%
+%     \tikz@spline@x=\dimexpr#1+#4*\tw@\relax
+%     \tikz@spline@y=\dimexpr#2+#5*\tw@\relax
+%     \tikz@spline@debug{\space\space\space r[i]=(\the\tikz@spline@x,\the\tikz@spline@y)}%
+%     \edef\tikz@spline@temp{%
+%       #4,#5/#6&%
+%       \the\tikz@spline@x,\the\tikz@spline@y/%
+%       #1,#2/#3&%
+%     }%
+%     \def\@next{\tikz@spline@compute@r#4,#5/#6&}%
+%   \else\ifnum\c@pgf@countc=\tikz@spline@max@interior@point
+%     % i = n-1
+%     % r_{n-1} = 8k_{n-1} + k_n - r_{n-2}*2/b
+%     \tikz@spline@debug{\number\c@pgf@countc: k[i]=(#1,#2), k[i+1]=(#4,#5),
+%              b=\number\c@pgf@counta/\number\c@pgf@countb}%
+%     \multiply\c@pgf@countb\tw@
+%     \tikz@spline@x=\dimexpr#1*8+#4-\tikz@spline@x*\c@pgf@countb/\c@pgf@counta\relax
+%     \tikz@spline@y=\dimexpr#2*8+#5-\tikz@spline@y*\c@pgf@countb/\c@pgf@counta\relax
+%     \tikz@spline@debug{\space\space\space r[i]=(\the\tikz@spline@x,\the\tikz@spline@y)}%
+%     \edef\tikz@spline@temp{%
+%       #4,#5/#6&%
+%       \the\tikz@spline@x,\the\tikz@spline@y/%
+%       \tikz@spline@temp
+%     }%
+%     \let\@next=\relax
+%   \else
+%     % 0 < i < n-1
+%     % r_i = 4k_i + 2k_{i+1} - r_{i-1}/b
+%     \tikz@spline@debug{\number\c@pgf@countc: k[i]=(#1,#2), k[i+1]=(#4,#5),
+%              b=\number\c@pgf@counta/\number\c@pgf@countb}%
+%     \tikz@spline@x=\dimexpr#1*4+#4*\tw@-\tikz@spline@x*\c@pgf@countb/\c@pgf@counta\relax
+%     \tikz@spline@y=\dimexpr#2*4+#5*\tw@-\tikz@spline@y*\c@pgf@countb/\c@pgf@counta\relax
+%     \tikz@spline@debug{\space\space\space r[i]=(\the\tikz@spline@x,\the\tikz@spline@y)}%
+%     \edef\tikz@spline@temp{%
+%       #4,#5/#6&%
+%       \the\tikz@spline@x,\the\tikz@spline@y/%
+%       \tikz@spline@temp
+%     }%
+%     \def\@next{\tikz@spline@compute@r#4,#5/#6&}%
+%   \fi\fi
+%   \tikz@spline@compute@b
+%   \advance\c@pgf@countc1
+%   \@next
+% }
+% 
+% % kx_{i+1},ky_{i+1}/name_{i+1}&rx_i,ry_i/kx_i,ky_i/name_i&
+% \def\tikz@spline@compute@segments#1,#2/#3&#4,#5/#6,#7/#8&{%
+%   \advance\c@pgf@countc by-1
+%   \tikz@spline@compute@b
+%   \def\@next{\tikz@spline@compute@segments#6,#7/#8&}%
+%   \ifnum\c@pgf@countc=\tikz@spline@max@interior@point
+%     % i = n - 1
+%     % p_{n-1} = r_{n-1}/b
+%     % q_{n-1} = (k_n + p_{n-1})/2
+%     \pgf@xa=\dimexpr#4*\c@pgf@countb/\c@pgf@counta\relax
+%     \pgf@ya=\dimexpr#5*\c@pgf@countb/\c@pgf@counta\relax
+%     \pgf@xb=\dimexpr(#1+\pgf@xa)/2\relax
+%     \pgf@yb=\dimexpr(#2+\pgf@ya)/2\relax
+%     \let\tikz@spline@temp\pgfutil@empty
+%   \else\ifnum0=\c@pgf@countc
+%     % i = 0
+%     % p_0 = (r_0 - p_1)/2
+%     % q_0 = 2k_1 - p_1
+%     \pgf@xa=\dimexpr(#4-\pgf@xc)/2\relax
+%     \pgf@ya=\dimexpr(#5-\pgf@yc)/2\relax
+%     \pgf@xb=\dimexpr#1*2-\pgf@xc\relax
+%     \pgf@yb=\dimexpr#2*2-\pgf@yc\relax
+%     \let\@next=\relax
+%   \else
+%     % 0 < i < n-1
+%     % p_i = (r_i - p_{i+1})/b
+%     % q_i = 2k_{i+1} - p_{i+1}
+%     \pgf@xa=\dimexpr(#4-\pgf@xc)*\c@pgf@countb/\c@pgf@counta\relax
+%     \pgf@ya=\dimexpr(#5-\pgf@yc)*\c@pgf@countb/\c@pgf@counta\relax
+%     \pgf@xb=\dimexpr#1*2-\pgf@xc\relax
+%     \pgf@yb=\dimexpr#2*2-\pgf@yc\relax
+%   \fi\fi
+%   \tikz@spline@debug{\the\c@pgf@countc:
+%     K[i]=(#6,#7),
+%     K[i+1]=(#1,#2)^^J\space\space\space
+%     r[i]=(#4,#5),
+%     b=\number\c@pgf@counta/\number\c@pgf@countb^^J\space\space\space
+%     P=(\the\pgf@xa,\the\pgf@ya),
+%     Q=(\the\pgf@ya,\the\pgf@yb),
+%   }%
+%   \expandafter\edef\csname tikz@spline@s@\number\c@pgf@countc\endcsname{%
+%     \def\noexpand\tikz@spline@zeroth{\noexpand\pgfqpoint{#6}{#7}}%
+%     \def\noexpand\tikz@spline@first{\noexpand\pgfqpoint{\the\pgf@xa}{\the\pgf@ya}}%
+%     \def\noexpand\tikz@spline@second{\noexpand\pgfqpoint{\the\pgf@xb}{\the\pgf@yb}}%
+%     \def\noexpand\tikz@spline@third{\noexpand\pgfqpoint{#1}{#2}}%
+%     \ifx\relax#8\relax
+%       \let\noexpand\tikz@spline@start\relax
+%     \else
+%       \def\noexpand\tikz@spline@start{#8}%
+%     \fi
+%     \ifx\relax#3\relax
+%       \let\noexpand\tikz@spline@end\relax
+%     \else
+%       \def\noexpand\tikz@spline@end{#3}%
+%     \fi
+%   }%
+%   \pgf@xc=\pgf@xa
+%   \pgf@yc=\pgf@ya
+%   \@next
+% }
+% 
+% \def\tikz@spline@select#1{%
+%   \csname tikz@spline@s@\number#1\endcsname
+% }
+% 
+% \def\tikz@spline@path{%
+%   \c@pgf@countc=0
+%   \tikz@spline@pathA
+%   % Update some values for TikZ in case additional path components are added
+%   \let\tikz@moveto@waiting=\tikz@spline@end
+% }
+% 
+% \newif\iftikz@spline@use@time
+% 
+% % Loop over the segments and add each one to the current path
+% \def\tikz@spline@pathA{%
+%   \tikz@spline@select{\c@pgf@countc}%
+%   \tikz@spline@third  \pgf@xc=\pgf@x \pgf@yc=\pgf@y
+%   \tikz@spline@second \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+%   \tikz@spline@first  \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+%   \tikz@spline@zeroth
+%   \tikz@spline@debug{Drawing (part of) the curve
+%     (\the\pgf@x,\the\pgf@y) (\the\pgf@xa,\the\pgf@ya)
+%     (\the\pgf@xb,\the\pgf@yb) (\the\pgf@xc,\the\pgf@yc)%
+%   }%
+%   % If the start or end coordinates are shapes, calculate the intersection
+%   % times
+%   \tikz@spline@use@timefalse
+%   \def\tikz@spline@timea{0}%
+%   \def\tikz@spline@timeb{1}%
+%   % Check for start shape
+%   \ifx\tikz@spline@start\relax\else
+%     \pgfutil@ifundefined{pgf@sh@bg@\csname pgf@sh@ns@\tikz@spline@start\endcsname}{%
+%     }{%
+%       \tikz@spline@border@time{\tikz@spline@start}{\tikz@spline@timea}{1}%
+%       \tikz@spline@use@timetrue
+%     }%
+%   \fi
+%   % Check for end shape
+%   \ifx\tikz@spline@end\relax\else
+%     \pgfutil@ifundefined{pgf@sh@bg@\csname pgf@sh@ns@\tikz@spline@end\endcsname}{%
+%     }{%
+%       \tikz@spline@border@time{\tikz@spline@end}{\tikz@spline@timeb}{\pgfintersectionsolutions}%
+%       \tikz@spline@use@timetrue
+%     }%
+%   \fi
+%   % If either endpoint was a shape, use \pgfpathcurvebetweentime to draw just
+%   % part of the curve.
+%   \iftikz@spline@use@time
+%     \tikz@spline@debug{\space\space\space\space from t=\tikz@spline@timea\space to
+%       t=\tikz@spline@timeb}%
+%     \pgfpathcurvebetweentime{\tikz@spline@timea}{\tikz@spline@timeb}{\tikz@spline@zeroth}%
+%       {\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
+%   \else
+%     \pgfpathcurveto{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
+%   \fi
+%   \ifnum\c@pgf@countc=0
+%     % Save the start time for the timer.
+%     \let\tikz@spline@timer@start=\tikz@spline@timea
+%   \fi
+%   \advance\c@pgf@countc by1
+%   \ifnum\c@pgf@countc<\tikz@spline@segments\relax
+%     \expandafter\tikz@spline@pathA
+%   \else
+%     % Save the end time for the timer, set the last position, and the tangent.
+%     \ifdim\tikz@spline@timeb pt<1pt
+%       \begingroup
+%       % \pgfpointcurveattime puts points on the tangent in xa/ya and xb/yb.
+%       % XXX: This was computed from the intersection before, we could reuse it.
+%       \pgfpointcurveattime{\tikz@spline@timeb}{\tikz@spline@zeroth}{\tikz@spline@first}{\tikz@spline@second}{\tikz@spline@third}%
+%       \global\pgf@x=\pgf@x
+%       \global\pgf@y=\pgf@y
+%       \edef\tikz@marshal{%
+%         \endgroup
+%         \def\noexpand\tikz@tangent{\noexpand\pgfqpoint{\the\pgf@xa}{\the\pgf@ya}}%
+%       }%
+%       \tikz@marshal
+%       \tikz@make@last@position{}% We already globally set \pgf@x/\pgf@y
+%     \else
+%       % The end point of the curve is the last position and the second control
+%       % point is on the tangent.
+%       \tikz@make@last@position{\tikz@spline@third}%
+%       \let\tikz@tangent=\tikz@spline@second
+%     \fi
+%     \let\tikz@spline@timer@end=\tikz@spline@timeb
+%   \fi
+% }
 
 % \tikz@spline@border@time{node}{\time}{which solution}
 \def\tikz@spline@border@time#1#2#3{
