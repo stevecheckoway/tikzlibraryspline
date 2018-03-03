@@ -37,11 +37,13 @@ def solve(rx, ry, cyclic):
     x[0] = rx[0]
     y[0] = ry[0]
     z[0] = 1
+    print("{}: bb={:.5f}, x={:.5f}pt, y={:.5f}pt, z={:.5f}pt".format(0, bb[0], x[0], y[0], z[0]))
     for i in range(1, n-1):
         bb[i] = 4.0 - 1.0/bb[i-1]       # bb[i] =  b[i] - c[i-1]*a[i]/bb[i-1]
         x[i] = rx[i] - x[i-1]/bb[i-1]   #  x[i] = rx[i] - x[i-1]*a[i]/bb[i-1]
         y[i] = ry[i] - y[i-1]/bb[i-1]   #  y[i] = ry[i] - y[i-1]*a[i]/bb[i-1]
         z[i] = 0.0 - z[i-1]/bb[i-1]     #  z[i] =  u[i] - z[i-1]*a[i]/bb[i-1]
+        print("{}: bb={:.5f}, x={:.5f}pt, y={:.5f}pt, z={:.5f}pt".format(i, bb[i], x[i], y[i], z[i]))
     if cyclic:
         # b[n-1] = 3, u[n-1] = 1
         an_1 = 1.0
@@ -54,14 +56,17 @@ def solve(rx, ry, cyclic):
     x[n-1] = rx[n-1] - an_1*x[n-2]/bb[n-2]   #  x[n-1] = rx[n-1] - x[n-2]*a[n-1]/bb[n-2]
     y[n-1] = ry[n-1] - an_1*y[n-2]/bb[n-2]   #  y[n-1] = ry[n-1] - y[n-2]*a[n-1]/bb[n-2]
     z[n-1] = 1.0 - z[n-2]/bb[n-2]       #  z[n-1] =  u[n-1] - z[n-2]*a[n-1]/bb[n-2]
+    print("{}: bb={:.5f}, x={:.5f}pt, y={:.5f}pt, z={:.5f}pt".format(n-1, bb[n-1], x[n-1], y[n-1], z[n-1]))
 
     x[n-1] = x[n-1]/bb[n-1]             # x[n-1] = x[n-1]/bb[n-1]
     y[n-1] = y[n-1]/bb[n-1]             # y[n-1] = y[n-1]/bb[n-1]
     z[n-1] = z[n-1]/bb[n-1]             # z[n-1] = z[n-1]/bb[n-1]
+    print("{}: bb={:.5f}, x={:.5f}pt, y={:.5f}pt, z={:.5f}pt".format(n-1, bb[n-1], x[n-1], y[n-1], z[n-1]))
     for i in range(n-2, -1, -1):
         x[i] = (x[i] - x[i+1])/bb[i]    # x[i] = (x[i] - c[i]*x[i+1])/bb[i]
         y[i] = (y[i] - y[i+1])/bb[i]    # y[i] = (y[i] - c[i]*y[i+1])/bb[i]
         z[i] = (z[i] - z[i+1])/bb[i]    # z[i] = (z[i] - c[i]*z[i+1])/bb[i]
+        print("{}: bb={:.5f}, x={:.5f}pt, y={:.5f}pt, z={:.5f}pt".format(i, bb[i], x[i], y[i], z[i]))
 
     if cyclic:
         d = 1 + z[0] + z[n-1]
@@ -138,10 +143,11 @@ if __name__ == '__main__':
         (3,1),
         (2,3),
         (1.5,0),
+        (0,1)
     ]
     print("spline_through:")
     spline_through(points, cyclic=False)
-    print("\nclosed_spline_through:")
-    spline_through(points, cyclic=True)
+    #print("\nclosed_spline_through:")
+    #spline_through(points, cyclic=True)
 
 # vim: set sw=4 sts=4 ts=8 et tw=0:

@@ -256,6 +256,7 @@
     \advance\tikz@spline@i by-1
   \fi
   % Keep track of how many bezier curve segments we'll be creating.
+  \tikz@spline@debug{Creating a spline with \the\tikz@spline@i\space segments}%
   \mathchardef\tikz@spline@segments=\tikz@spline@i
   \tikz@next
 }
@@ -282,23 +283,24 @@
     \iftikz@spline@closed
       % a/b = bb[n-2]
       \tikz@spline@lookup@closed{\c@pgf@counta}%
-      % We want bb[n-1] = (3b - 1)/a so set c = 3b - 1.
-      \c@pgf@countc=\c@pgf@countb
-      \multiply\c@pgf@countc by3
-      \advance\c@pgf@countc by1
+      % We want bb[n-1] = (3a - b)/a so set d = 3a - b.
+      \c@pgf@countd=\c@pgf@counta
+      \multiply\c@pgf@countd by3
+      \advance\c@pgf@countd by-\c@pgf@countb
     \else
       % a/b = bb[n-2]
       \tikz@spline@lookup@open{\c@pgf@counta}%
-      % We want bb[n-1] = (7b - 2)/a so set c = 7b - 2.
-      \c@pgf@countc=\c@pgf@countb
-      \multiply\c@pgf@countc by7
-      \advance\c@pgf@countc by-2
+      % We want bb[n-1] = (7a - 2b)/a so set d = 7a - 2b.
+      \c@pgf@countd=\c@pgf@counta
+      \multiply\c@pgf@countd by7
+      \advance\c@pgf@countd by-\c@pgf@countb
+      \advance\c@pgf@countd by-\c@pgf@countb
     \fi
     \c@pgf@countb=\c@pgf@counta
-    \c@pgf@counta=\c@pgf@countc
+    \c@pgf@counta=\c@pgf@countd
   \else
     % bb[i]
-    \advance\c@pgf@counta by1
+    \advance\c@pgf@counta by-1
     \iftikz@spline@closed
       \tikz@spline@lookup@closed{\c@pgf@counta}%
     \else
@@ -340,16 +342,15 @@
 \def\tikz@spline@computeP{%
   % Perform the first step of the forward sweep of solving the tridiagonal (or
   % cyclic) matrix equation.
-  % XXX: Explain algorithm.
   \tikz@spline@get@K{0}%
   \iftikz@spline@closed
-    % R[0] = K[0] + 2*K[1]
-    \pgf@xa=\pgf@x
-    \pgf@ya=\pgf@y
-  \else
     % R[0] = 4K[0] + 2K[1]
     \pgf@xa=4\pgf@x
     \pgf@ya=4\pgf@y
+  \else
+    % R[0] = K[0] + 2*K[1]
+    \pgf@xa=\pgf@x
+    \pgf@ya=\pgf@y
   \fi
   \tikz@spline@get@K{1}%
   \advance\pgf@xa by2\pgf@x
@@ -357,12 +358,19 @@
   % x[0] = rx[0]
   % y[0] = ry[0]
   % z[0] = 1
+  \pgf@xc=1pt
   \tikz@spline@save@C{0}{%
     \pgf@xa=\the\pgf@xa
     \pgf@ya=\the\pgf@ya
-    \pgf@xc=1pt
+    \pgf@xc=\the\pgf@xc
   }%
   \tikz@spline@lookup@bb{0}%
+  \tikz@spline@debug{%
+    0: bb=\the\c@pgf@counta/\the\c@pgf@countb,
+    x=\the\pgf@xa,
+    y=\the\pgf@ya,
+    z=\the\pgf@xc%
+  }%
   \tikz@spline@i=1
   \c@pgf@countc=2
   \tikz@spline@computePA
@@ -393,6 +401,13 @@
     \pgf@xc=\the\pgf@xc
   }%
   \tikz@spline@lookup@bb{\tikz@spline@i}%
+  \tikz@spline@debug{%
+    \the\tikz@spline@i:
+    bb=\the\c@pgf@counta/\the\c@pgf@countb,
+    x=\the\pgf@xa,
+    y=\the\pgf@ya,
+    z=\the\pgf@xc%
+  }%
   \advance\tikz@spline@i by1
   \advance\c@pgf@countc by1
   \ifnum\c@pgf@countc=\tikz@spline@segments
@@ -411,9 +426,24 @@
   % \pgf@xa/\pgf@ya = P[n-2]
   % \pgf@xc = z[n-2]
   % \c@pgf@counta/\c@pgf@countb = bb[n-2]
-  \pgf@xb=4\pgf@x
-  \pgf@yb=4\pgf@y
-  \tikz@spline@get@K{\c@pgf@countc}%
+  \iftikz@spline@closed
+    \pgf@xb=4\pgf@x
+    \pgf@yb=4\pgf@y
+    \tikz@spline@get@K{0}%
+    \advance\pgf@xb by2\pgf@x
+    \advance\pgf@yb by2\pgf@y
+    % P[n-1] = R[n-1] - P[n-2]/bb[n-2]
+    % z[n-1] = 1 - z[n-2]/bb[n-2]
+  \else
+    % R[n-1] = 8K[n-1] + K[n]
+    \pgf@xb=8\pgf@x
+    \pgf@yb=8\pgf@y
+    \tikz@spline@get@K{\c@pgf@countc}%
+    \advance\pgf@xb by\pgf@x
+    \advance\pgf@yb by\pgf@y
+    % P[n-1] = R[n-1] - 2P[n-2]/bb[n-2]
+    \advance\c@pgf@countb by\c@pgf@countb
+  \fi
   \pgf@xa=\dimexpr\pgf@xb-\pgf@xa*\c@pgf@countb/\c@pgf@counta\relax
   \pgf@ya=\dimexpr\pgf@yb-\pgf@ya*\c@pgf@countb/\c@pgf@counta\relax
   \pgf@xc=\dimexpr1pt-\pgf@xc*\c@pgf@countb/\c@pgf@counta\relax
@@ -422,15 +452,28 @@
   % P[n-1] = P[n-1]/bb[n-1]
   % z[n-1] = z[n-1]/bb[n-1]
   \tikz@spline@lookup@bb{\tikz@spline@i}%
+  \tikz@spline@debug{%
+    \the\tikz@spline@i:
+    bb=\the\c@pgf@counta/\the\c@pgf@countb,
+    x=\the\pgf@xa,
+    y=\the\pgf@ya,
+    z=\the\pgf@xc%
+  }%
   % Store P[n-1] in \pgf@xb/\pgf@yb and z[n-1] in \pgf@yc
   \pgf@xb=\dimexpr\pgf@xa*\c@pgf@countb/\c@pgf@counta\relax
   \pgf@yb=\dimexpr\pgf@ya*\c@pgf@countb/\c@pgf@counta\relax
   \pgf@yc=\dimexpr\pgf@xc*\c@pgf@countb/\c@pgf@counta\relax
-  \tikz@spline@i=\c@pgf@countc
   \tikz@spline@save@C{\tikz@spline@i}{%
     \pgf@xa=\the\pgf@xb
     \pgf@ya=\the\pgf@yb
     \pgf@xc=\the\pgf@yc
+  }%
+  \tikz@spline@debug{%
+    \the\tikz@spline@i:
+    bb=\the\c@pgf@counta/\the\c@pgf@countb,
+    x=\the\pgf@xb,
+    y=\the\pgf@yb,
+    z=\the\pgf@yc%
   }%
   \def\tikz@next{\tikz@spline@computePC}%
   \tikz@spline@computePC
@@ -445,6 +488,7 @@
   %
   % P[i] = (P[i] - P[i+1])/bb[i]
   % z[i] = (z[i] - z[i+1])/bb[i]
+  \tikz@spline@lookup@bb{\tikz@spline@i}%
   \tikz@spline@get@C{\tikz@spline@i}%
   \pgf@xb=\dimexpr(\pgf@xa-\pgf@xb)*\c@pgf@countb/\c@pgf@counta\relax
   \pgf@yb=\dimexpr(\pgf@ya-\pgf@yb)*\c@pgf@countb/\c@pgf@counta\relax
@@ -453,6 +497,13 @@
     \pgf@xa=\the\pgf@xb
     \pgf@ya=\the\pgf@yb
     \pgf@xc=\the\pgf@yc
+  }%
+  \tikz@spline@debug{%
+    \the\tikz@spline@i:
+    bb=\the\c@pgf@counta/\the\c@pgf@countb,
+    x=\the\pgf@xb,
+    y=\the\pgf@yb,
+    z=\the\pgf@yc%
   }%
   \ifnum\tikz@spline@i=0
     \tikz@spline@i=\tikz@spline@segments
