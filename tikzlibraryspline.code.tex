@@ -822,11 +822,7 @@
   \advance\tikz@spline@i by1
   \def\tikz@temp##1{\tikz@spline@name\space ##1-\the\tikz@spline@i}%
   \edef\tikz@marshal{%
-    \ifx\tikz@shapeborder@name\relax
-      node[shape=coordinate](\tikz@temp{K})at(\the\pgf@x,\the\pgf@y){}%
-    \else
-      node also[alias={\tikz@temp{K}}](\tikz@shapeborder@name)%
-    \fi
+    node[shape=coordinate](\tikz@temp{K})at(\the\pgf@x,\the\pgf@y){}%
     node[shape=coordinate](\tikz@temp{P})at(\the\pgf@xa,\the\pgf@ya){}%
     node[shape=coordinate](\tikz@temp{Q})at(\the\pgf@xb,\the\pgf@yb){}%
   }%
@@ -840,11 +836,7 @@
     \fi
     \advance\tikz@spline@i by1
     \edef\tikz@marshal{%
-      \ifx\tikz@shapeborder@name\relax
-        node[shape=coordinate](\tikz@temp{K})at(\the\pgf@x,\the\pgf@y){}%
-      \else
-        node also[alias={\tikz@temp{K}}](\tikz@shapeborder@name)%
-      \fi
+      node[shape=coordinate](\tikz@temp{K})at(\the\pgf@x,\the\pgf@y){}%
     }%
     \expandafter\endpgfextra\tikz@marshal
     \pgfextra
