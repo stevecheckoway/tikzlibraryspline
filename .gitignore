@@ -3,4 +3,9 @@
 *.fls
 *.synctex.gz
 *.log
+*.idx
+*.ilg
+*.ind
+*.out
 test.pdf
+/doc/tikzlibraryspline.pdf

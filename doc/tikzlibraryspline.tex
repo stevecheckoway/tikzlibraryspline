@@ -1,0 +1,264 @@
+\documentclass[a4paper]{ltxdoc}
+\usepackage[a4paper,left=2.25cm,right=2.25cm,top=2.5cm,bottom=2.5cm,nohead]{geometry}
+\usepackage{amsmath}
+\usepackage{makeidx}
+\usepackage{tikz}
+\usepackage[T1]{fontenc}
+\usepackage{trace}
+
+% These are required to typeset the manual.
+\usepackage{calc}
+\usepackage{hyperref}
+
+% We can't use \usetikzlibrary{spline} because TeX won't find the correct
+% file one directory up. So fake it.
+%\usetikzlibrary{spline}
+\makeatletter
+\input{../tikzlibraryspline.code}
+\let\tikz@library@spline@loaded\empty
+\makeatother
+
+\input{pgfmanual-en-macros}
+\makeindex
+
+\title{\tikzname\ spline library}
+\author{Stephen Checkoway}
+\date{2018-03-13}
+
+\begin{document}
+\maketitle
+
+\section{Constructing splines through points}
+
+\begin{tikzlibrary}{spline}
+This library enables drawing cubic B\'ezier splines through specified points.
+\end{tikzlibrary}
+
+When you load this library, the following options become available:
+
+\begin{keylist}{%
+    /tikz/spline through=\meta{coordinates or nodes},
+    /tikz/closed spline through=\meta{coordinates or nodes}}
+These options must be given to a |to| or |edge| path command. The
+\meta{coordinates or nodes} should be a sequence of \tikzname\ coordinates or
+node names, one directly after the other without commas (like with the
+|plot coordinates| path operation). Examples are |(1,0) (2,2)| or
+|(a) (1,0) (b)|, where |a| and |b| are nodes. For |closed spline through|, the
+\meta{coordinates or nodes} must contain at least two coordinates or node
+names.
+
+A spline is constructed from the current position through each of the
+\meta{coordinates or nodes} and ending either at the target of the |to| or |edge|
+path command for |spline through| or at the current position for 
+|closed spline through|.
+\begin{codeexample}[]
+\begin{tikzpicture}[thick]
+  \draw[help lines] (0,0) grid (3,2);
+  \node[draw=red, circle] (A) at (1,0) {A};
+  \node[draw=blue, rectangle] (B) at (2,2) {B};
+  \node[draw=green!60!black, circle] (C) at (3,1) {C};
+  
+  \draw (A) to[spline through={(0,1)(B)(2,1)}] (C);
+\end{tikzpicture}
+\end{codeexample}
+
+\begin{codeexample}[]
+\begin{tikzpicture}[thick]
+  \draw[help lines] (0,0) grid (3,2);
+  \node[draw=red, circle] (A) at (1,0) {A};
+  \node[draw=blue, rectangle] (B) at (2,2) {B};
+  \node[draw=green!60!black, circle] (C) at (3,1) {C};
+  
+  \draw (A) to[closed spline through={(0,1)(B)(2,1)(C)}] (A);
+\end{tikzpicture}
+\end{codeexample}
+
+If you want the curve to not stop at the border of a node, the |center| anchor
+(or any other node anchor) can be given.
+\begin{codeexample}[]
+\begin{tikzpicture}[thick]
+  \draw[help lines] (0,0) grid (3,2);
+  \node[draw=red, circle] (A) at (1,0) {A};
+  \node[draw=blue, rectangle] (B) at (2,2) {B};
+  \node[draw=green!60!black, circle] (C) at (3,1) {C};
+  
+  \draw (A.135) to[spline through={(0,1)(B.south)(2,1)}] (C.center);
+\end{tikzpicture}
+\end{codeexample}
+
+\begin{codeexample}[]
+\begin{tikzpicture}[thick]
+  \draw[help lines] (0,0) grid (3,2);
+  \node[draw=red, circle] (A) at (1,0) {A};
+  \node[draw=blue, rectangle] (B) at (2,2) {B};
+  \node[draw=green!60!black, circle] (C) at (3,1) {C};
+  
+  \draw (A.135) to[closed spline through={(0,1)(B.south)(2,1)(C.center)}] (A);
+\end{tikzpicture}
+\end{codeexample}
+\end{keylist}
+
+\begin{key}{/tikz/spline coordinates=\meta{name prefix} (default spline)}
+This option must be given to a |to| or |edge| path command that is also given
+one of |spline through| or |closed spline through|.
+
+The spline's ``knot'' points---the specified points of the spline---and
+control points are made available as coordinates. If the spline has $n$
+segments, then the knot points $K_1,K_2,\dotsc,K_{n+1}$ have names \meta{name prefix}
+|K-1|, \meta{name prefix} |K-2|, and so on.
+(For a closed spline, the $(n+1)$th knot point is the starting
+point of the spline.) The $2n$ control points $P_1,P_2,\dotsc,P_n$ and
+$Q_1,Q_2,\dotsc,Q_n$ 
+are available with names \meta{name prefix} |P-1|, \meta{name prefix} |Q-1|,
+\meta{name prefix} |P-2|, \meta{name prefix} |Q-2|, and so on.
+
+The $i$th segment of the spline is a cubic B\`ezier curve from $K_i$ to
+$K_{i+1}$ with control points $P_i$ and $Q_i$. In \tikzname, the third segment
+can be expressed as\\[.5\baselineskip]
+\begingroup
+\frenchspacing
+\null\quad |(spline K-3) .. controls (spline P-3) and (spline Q-3) .. (spline K-4)|
+\endgroup
+
+The number of segments is available as the \TeX\ macro
+\cs{tikzsplinesegments}.
+
+\begin{codeexample}[]
+\begin{tikzpicture}[thick]
+  \draw[help lines] (0,0) grid (3,2);
+  \coordinate (A) at (1,0);
+  \coordinate (B) at (2,2);
+  \coordinate (C) at (3,1);
+  
+  \draw (A) to[spline coordinates=S,
+               closed spline through={(0,1)(B)(2,1)(C)}] (A);
+  \foreach \i [evaluate=\i as \j using \i+1] in {1,2,...,\tikzsplinesegments} {
+    \draw[semithick]  (S K-\i) -- (S P-\i)
+                      (S K-\j) -- (S Q-\i);
+    \path[fill=green!60!black] (S P-\i) circle (2pt);
+    \path[fill=red] (S Q-\i) circle (2pt);
+  }
+\end{tikzpicture}
+\end{codeexample}
+\end{key}
+
+\section{Intersection with shapes}
+When \tikzname\ creates a B\'ezier curve where one or both of the end points
+is a node, it constructs the line through the center of the node tangent to
+the curve at that point. \tikzname\ then computes the intersection of the line
+with the node's background path. Finally, it adjusts the end point of the
+curve to be the intersection point. This happens without changing the curve's
+control points. The result is a completely different curve. Compare the red
+and black curves.
+\begin{codeexample}[]
+\begin{tikzpicture}[thick]
+  \draw[help lines] (0,0) grid (3,2);
+  \node[draw, circle] (A) at (0,1) {A};
+  \node[draw] (B) at (3,1) {B};
+  \draw[red] (A.center) .. controls +(0,1) and +(0,1) .. (B.center);
+  \draw (A) .. controls +(0,1) and +(0,1) .. (B);
+\end{tikzpicture}
+\end{codeexample}
+
+Normally, this difference is not a big deal and it's fast for \pgfname\ to
+compute this border point. Unfortunately, when the same procedure is applied
+to a B\`ezier spline, the result is slightly unsettling.
+
+In the example below, the red line has been drawn explicitly from the
+|closed spline through|'s knot and control points whereas the black line uses
+the same control points but the start and end points have been modified
+according to \tikzname's normal procedure.
+\begin{codeexample}[]
+\begin{tikzpicture}[thick]
+  \draw[help lines] (0,0) grid (3,3);
+  \node[draw,circle]    (A) at (0,1)   {A};
+  \node[draw]           (B) at (3,1)   {B};
+  \node[draw,circle]    (C) at (2,3)   {C};
+  \node[draw,circle]    (D) at (1.5,0) {D};
+  
+  \path
+    (A.center) to[spline coordinates=S,
+                  closed spline through=(B.center)(C.center)(D.center)] (A);
+  \draw[red]
+    (A.center) .. controls (S P-1) and (S Q-1) .. (B.center)
+               .. controls (S P-2) and (S Q-2) .. (C.center)
+               .. controls (S P-3) and (S Q-3) .. (D.center)
+               .. controls (S P-4) and (S Q-4) .. (A.center);
+  \draw (A) .. controls (S P-1) and (S Q-1) .. (B)
+            .. controls (S P-2) and (S Q-2) .. (C)
+            .. controls (S P-3) and (S Q-3) .. (D)
+            .. controls (S P-4) and (S Q-4) .. (A);
+\end{tikzpicture}
+\end{codeexample}
+None of the black line's intersections with the node borders look quite right.
+
+The |spline| library uses the \pgfname\ |intersections| library to compute the
+intersection of the spline with node background shapes. This is slower, but
+the result is significantly better.
+
+\begin{codeexample}[]
+\begin{tikzpicture}
+  \draw[help lines] (0,0) grid (3,3);
+  \node[draw,circle]    (A) at (0,1)   {A};
+  \node[draw]           (B) at (3,1)   {B};
+  \node[draw,circle]    (C) at (2,3)   {C};
+  \node[draw,circle]    (D) at (1.5,0) {D};
+  
+  \path
+    (A.center) to[spline coordinates=S,
+                  closed spline through=(B.center)(C.center)(D.center)] (A);
+  \draw[red]
+    (A.center) .. controls (S P-1) and (S Q-1) .. (B.center)
+               .. controls (S P-2) and (S Q-2) .. (C.center)
+               .. controls (S P-3) and (S Q-3) .. (D.center)
+               .. controls (S P-4) and (S Q-4) .. (A.center);
+  \draw[thick] (A) to[closed spline through=(B)(C)(D)] (A);
+\end{tikzpicture}
+\end{codeexample}
+
+\section{Placing nodes along a spline}
+Nodes can be placed along a spline as with any other standard path by giving a
+|pos=|\meta{time} option to the node.
+\begin{codeexample}[]
+\begin{tikzpicture}[thick]
+  \draw[help lines] (0,0) grid (3,2);
+  \node[draw=red, circle] (A) at (1,0) {A};
+  \node[draw=blue, rectangle] (B) at (2,2) {B};
+  \node[draw=green!60!black, circle] (C) at (3,1) {C};
+  
+  \draw (A) to[spline through={(0,1)(B)(2,1)}, node font=\footnotesize]
+    node foreach \pos in {0, .25, .5, .75, 1}
+      [pos=\pos, fill=blue, circle, inner sep=1pt] {}
+    node[pos=0, auto] {$0$}
+    node[pos=.25, auto] {$.25$}
+    node[pos=.5, auto] {$.5$}
+    node[pos=.75, auto, swap] {$.75$}
+    node[pos=1, auto] {$1$}
+    (C);
+\end{tikzpicture}
+\end{codeexample}
+Note that the distance between |pos=.25| and |pos=.5| is much greater than the
+distance between |pos=.75| and |pos=1|.
+
+The position along the curve is computed by first dividing $[0,1]$ into $n$
+equal-size intervals for a spline with $n$ segments. After selecting the
+segment, the position along the segment is computed in the normal fashion for
+curves with one exception. If the start of the spline is a node with a
+background shape, |pos=0| is set to the intersection of the curve and the
+shape. Similarly, if the end of the spline is a node with a background shape,
+|pos=1| is set to the intersection of the curve with the shape.
+
+Just as with normal \tikzname\ curves, positioning nodes requires a bit of a
+trial-and-error.
+
+\section{Debugging constructed splines}
+\begin{key}{/tikz/spline debug=\meta{boolean} (default true, initially false)}
+When given as an option to a |to| or |edge| path command, this causes
+debugging output to be written to the log and the terminal. It is not intended
+to be useful to end users but the author found it invaluable for debugging the
+code.
+\end{key}
+
+\printindex
+\end{document}
+% vim: set sw=2 sts=2 ts=8 et:
