@@ -203,6 +203,7 @@
     to path={%
       \pgfextra
       \tikz@spline@closedtrue
+      \let\tikztotarget=\tikztostart
       \tikz@splinethrough{(\tikztostart)#1}%
       \tikztonodes
     }%
