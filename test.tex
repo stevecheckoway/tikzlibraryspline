@@ -67,6 +67,17 @@
 \showcontrols{spline}
 \end{tikzpicture}
 
+\begin{tikzpicture}
+\draw[help lines] (0,0) grid (3,3);
+\draw[blue] (0,0) to[spline through={(1,2)(2,1)}] (2,2)
+            -- +(1,1);
+\end{tikzpicture}
+\begin{tikzpicture}
+\draw[help lines] (0,0) grid (3,3);
+\draw[blue] (0,0) to[closed spline through={(1,2)(2,1)}] ()
+            -- +(1,0);
+\end{tikzpicture}
+
 % \begin{tikzpicture}
 % \draw circle (1cm);
 % \draw[red, <-] \pgfextra
